@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: paint-tracker-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: painttracker
+      POSTGRES_PASSWORD: painttracker
+      POSTGRES_DB: painttracker
+    ports:
+      - "5436:5432"
+    volumes:
+      - paint-tracker-pgdata:/var/lib/postgresql/data
+
+volumes:
+  paint-tracker-pgdata:

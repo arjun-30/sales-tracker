@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  sales_employee
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  delivered
+  cancelled
+}
+
+model District {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  centerLat Float
+  centerLng Float
+  createdAt DateTime @default(now())
+
+  users  User[]
+  orders Order[]
+  visits Visit[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String   @unique
+  passwordHash String
+  role         Role
+  districtId   String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  district         District?         @relation(fields: [districtId], references: [id])
+  employeeLocation EmployeeLocation?
+  locationHistory  LocationHistory[]
+  orders           Order[]
+  visits           Visit[]
+}
+
+model EmployeeLocation {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  lat       Float
+  lng       Float
+  accuracy  Float?
+  onDuty    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LocationHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  lat        Float
+  lng        Float
+  accuracy   Float?
+  recordedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, recordedAt])
+}
+
+model Product {
+  id        String   @id @default(cuid())
+  name      String
+  shortCode String   @unique
+  category  String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  variants ProductVariant[]
+}
+
+model ProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  sizeLabel String
+  unit      String
+  price     Float    @default(0)
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@unique([productId, sizeLabel])
+}
+
+model Order {
+  id           String      @id @default(cuid())
+  employeeId   String
+  districtId   String
+  customerName String
+  customerPhone String?
+  shopName     String?
+  totalAmount  Float
+  status       OrderStatus @default(pending)
+  notes        String?
+  lat          Float?
+  lng          Float?
+  createdAt    DateTime    @default(now())
+
+  employee User        @relation(fields: [employeeId], references: [id])
+  district District    @relation(fields: [districtId], references: [id])
+  items    OrderItem[]
+
+  @@index([employeeId, createdAt])
+  @@index([districtId, createdAt])
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  variantId String
+  quantity  Int
+  unitPrice Float
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+}
+
+model Visit {
+  id            String    @id @default(cuid())
+  employeeId    String
+  districtId    String
+  shopName      String
+  checkInAt     DateTime  @default(now())
+  checkInLat    Float
+  checkInLng    Float
+  checkOutAt    DateTime?
+  checkOutLat   Float?
+  checkOutLng   Float?
+  notes         String?
+
+  employee User     @relation(fields: [employeeId], references: [id])
+  district District @relation(fields: [districtId], references: [id])
+
+  @@index([employeeId, checkInAt])
+}
