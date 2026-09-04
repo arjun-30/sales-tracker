@@ -3,20 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-}
-
-enum Role {
-  admin
-  sales_employee
-}
-
-enum OrderStatus {
-  pending
-  confirmed
-  delivered
-  cancelled
 }
 
 model District {
@@ -36,7 +24,7 @@ model User {
   name         String
   phone        String   @unique
   passwordHash String
-  role         Role
+  role         String
   districtId   String?
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -109,7 +97,7 @@ model Order {
   customerPhone String?
   shopName     String?
   totalAmount  Float
-  status       OrderStatus @default(pending)
+  status       String      @default("pending")
   notes        String?
   lat          Float?
   lng          Float?

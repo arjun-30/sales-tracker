@@ -72,7 +72,7 @@ reportsRouter.get("/summary", async (req, res) => {
         ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
         : Prisma.empty;
       return prisma.$queryRaw<{ day: string; total: number; count: bigint }[]>`
-        SELECT to_char("createdAt", 'YYYY-MM-DD') as day, SUM("totalAmount")::float as total, COUNT(*) as count
+        SELECT strftime('%Y-%m-%d', "createdAt") as day, SUM("totalAmount") as total, COUNT(*) as count
         FROM "Order"
         ${where}
         GROUP BY day ORDER BY day ASC

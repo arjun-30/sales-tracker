@@ -6,7 +6,7 @@ import type { District, EmployeeLocation } from "../lib/types";
 import { Select } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
 
-const CHENNAI = { lat: 13.0827, lng: 80.2707 };
+const TAMIL_NADU_CENTER = { lat: 10.8284, lng: 78.7638 };
 const containerStyle = { width: "100%", height: "calc(100vh - 3rem)" };
 
 interface LiveEntry {
@@ -24,10 +24,15 @@ export function LiveMap() {
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "",
   });
 
+  const [map, setMap] = useState<google.maps.Map | null>(null);
   const [districts, setDistricts] = useState<District[]>([]);
   const [districtFilter, setDistrictFilter] = useState("");
   const [entries, setEntries] = useState<Record<string, LiveEntry>>({});
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+
+  const onLoadMap = useCallback((mapInstance: google.maps.Map) => {
+    setMap(mapInstance);
+  }, []);
 
   useEffect(() => {
     api<{ districts: District[] }>("/api/districts").then((d) => setDistricts(d.districts));
@@ -71,12 +76,30 @@ export function LiveMap() {
     };
   }, []);
 
+  const selectedDistrict = useMemo(
+    () => districts.find((d) => d.id === districtFilter),
+    [districts, districtFilter]
+  );
+
+  useEffect(() => {
+    if (!map) return;
+    if (selectedDistrict) {
+      map.panTo({ lat: selectedDistrict.centerLat, lng: selectedDistrict.centerLng });
+      map.setZoom(10);
+    } else {
+      map.panTo(TAMIL_NADU_CENTER);
+      map.setZoom(7);
+    }
+  }, [map, selectedDistrict]);
+
   const visibleEntries = useMemo(
     () => Object.values(entries).filter((e) => !districtFilter || e.districtId === districtFilter),
     [entries, districtFilter]
   );
 
-  const onSelect = useCallback((id: string) => setSelected((cur) => (cur === id ? null : id)), []);
+  const onSelectEmployee = useCallback((id: string) => {
+    setSelectedEmployee((cur) => (cur === id ? null : id));
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -102,26 +125,41 @@ export function LiveMap() {
 
       <Card className="overflow-hidden">
         {isLoaded ? (
-          <GoogleMap mapContainerStyle={containerStyle} center={CHENNAI} zoom={7}>
+          <GoogleMap
+            mapContainerStyle={containerStyle}
+            center={TAMIL_NADU_CENTER}
+            zoom={7}
+            onLoad={onLoadMap}
+            options={{
+              disableDefaultUI: false,
+              zoomControl: true,
+              streetViewControl: false,
+              mapTypeControl: false,
+            }}
+          >
+            {/* Clean employee markers */}
             {visibleEntries.map((e) => (
               <MarkerF
                 key={e.employeeId}
                 position={{ lat: e.lat, lng: e.lng }}
-                onClick={() => onSelect(e.employeeId)}
+                onClick={() => onSelectEmployee(e.employeeId)}
                 icon={{
                   path: google.maps.SymbolPath.CIRCLE,
-                  scale: 8,
+                  scale: 9,
                   fillColor: "#2563eb",
                   fillOpacity: 1,
                   strokeColor: "#ffffff",
-                  strokeWeight: 2,
+                  strokeWeight: 2.5,
                 }}
               >
-                {selected === e.employeeId && (
-                  <InfoWindowF position={{ lat: e.lat, lng: e.lng }} onCloseClick={() => setSelected(null)}>
-                    <div className="text-sm">
-                      <div className="font-semibold">{e.name}</div>
-                      <div className="text-slate-500">
+                {selectedEmployee === e.employeeId && (
+                  <InfoWindowF
+                    position={{ lat: e.lat, lng: e.lng }}
+                    onCloseClick={() => setSelectedEmployee(null)}
+                  >
+                    <div className="text-sm p-1">
+                      <div className="font-semibold text-slate-900">{e.name}</div>
+                      <div className="text-xs text-slate-500">
                         Updated {new Date(e.updatedAt).toLocaleTimeString()}
                       </div>
                     </div>
@@ -137,9 +175,22 @@ export function LiveMap() {
         )}
       </Card>
 
-      <div className="text-sm text-slate-500">
-        {visibleEntries.length} employee{visibleEntries.length === 1 ? "" : "s"} on duty
+      <div className="flex items-center justify-between text-sm text-slate-500">
+        <div>
+          {visibleEntries.length} employee{visibleEntries.length === 1 ? "" : "s"} on duty
+          {selectedDistrict ? ` in ${selectedDistrict.name}` : ""}
+        </div>
+        {selectedDistrict && (
+          <button
+            onClick={() => setDistrictFilter("")}
+            className="text-blue-600 hover:underline text-xs font-medium"
+          >
+            Reset view to all districts
+          </button>
+        )}
       </div>
     </div>
   );
 }
+
+
