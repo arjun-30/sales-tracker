@@ -6,7 +6,7 @@ import type { District, EmployeeLocation } from "../lib/types";
 import { Select } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
 
-const CHENNAI = { lat: 13.0827, lng: 80.2707 };
+const TAMIL_NADU_CENTER = { lat: 10.8284, lng: 78.7638 };
 const containerStyle = { width: "100%", height: "calc(100vh - 3rem)" };
 
 // Bounding box of the TN districts geojson, padded slightly so state edges
@@ -76,7 +76,7 @@ export function LiveMap() {
   const [districts, setDistricts] = useState<District[]>([]);
   const [districtFilter, setDistrictFilter] = useState("");
   const [entries, setEntries] = useState<Record<string, LiveEntry>>({});
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const [geoReady, setGeoReady] = useState(false);
   const [hoveredDistrict, setHoveredDistrict] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -143,14 +143,16 @@ export function LiveMap() {
     [entries, districtFilter]
   );
 
-  const onSelect = useCallback((id: string) => setSelected((cur) => (cur === id ? null : id)), []);
+  const onSelectEmployee = useCallback((id: string) => {
+    setSelectedEmployee((cur) => (cur === id ? null : id));
+  }, []);
 
   // The selected employee can vanish from `entries` (goes off duty) without
-  // ever passing back through onSelect, which would otherwise leave a
-  // dangling InfoWindow reference for an id that no longer renders a marker.
+  // ever passing back through onSelectEmployee, which would otherwise leave
+  // a dangling InfoWindow reference for an id that no longer renders a marker.
   useEffect(() => {
-    if (selected && !entries[selected]) setSelected(null);
-  }, [selected, entries]);
+    if (selectedEmployee && !entries[selectedEmployee]) setSelectedEmployee(null);
+  }, [selectedEmployee, entries]);
 
   const selectedDistrictName = useMemo(
     () => districts.find((d) => d.id === districtFilter)?.name ?? null,
@@ -286,6 +288,12 @@ export function LiveMap() {
               <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm backdrop-blur">
                 <span className="h-2.5 w-3.5 rounded-sm border-2 border-blue-700 bg-blue-600/15" />
                 {selectedDistrictName} boundary
+                <button
+                  onClick={() => setDistrictFilter("")}
+                  className="font-medium text-blue-600 hover:underline"
+                >
+                  Reset
+                </button>
               </div>
             )}
           </div>
@@ -293,7 +301,7 @@ export function LiveMap() {
         {isLoaded ? (
           <GoogleMap
             mapContainerStyle={containerStyle}
-            center={CHENNAI}
+            center={TAMIL_NADU_CENTER}
             zoom={7}
             options={MAP_OPTIONS}
             onLoad={(map) => {
@@ -316,21 +324,24 @@ export function LiveMap() {
                 <MarkerF
                   key={e.employeeId}
                   position={{ lat: e.lat, lng: e.lng }}
-                  onClick={() => onSelect(e.employeeId)}
+                  onClick={() => onSelectEmployee(e.employeeId)}
                   icon={{
                     path: google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
+                    scale: 9,
                     fillColor: isStale ? "#94a3b8" : "#2563eb",
                     fillOpacity: isStale ? 0.6 : 1,
                     strokeColor: "#ffffff",
-                    strokeWeight: 2,
+                    strokeWeight: 2.5,
                   }}
                 >
-                  {selected === e.employeeId && (
-                    <InfoWindowF position={{ lat: e.lat, lng: e.lng }} onCloseClick={() => setSelected(null)}>
-                      <div className="text-sm">
-                        <div className="font-semibold">{e.name}</div>
-                        <div className={isStale ? "text-amber-600" : "text-slate-500"}>
+                  {selectedEmployee === e.employeeId && (
+                    <InfoWindowF
+                      position={{ lat: e.lat, lng: e.lng }}
+                      onCloseClick={() => setSelectedEmployee(null)}
+                    >
+                      <div className="text-sm p-1">
+                        <div className="font-semibold text-slate-900">{e.name}</div>
+                        <div className={isStale ? "text-xs text-amber-600" : "text-xs text-slate-500"}>
                           {isStale ? "Last seen" : "Updated"} {new Date(e.updatedAt).toLocaleTimeString()}
                         </div>
                       </div>
@@ -349,3 +360,5 @@ export function LiveMap() {
     </div>
   );
 }
+
+

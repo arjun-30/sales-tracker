@@ -4,6 +4,9 @@ build/
 .env
 .env.local
 *.log
+*.db
+*.db-journal
+*.sqlite
 .expo/
 .expo-shared/
 android/
