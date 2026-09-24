@@ -135,14 +135,42 @@ const statusSchema = z.object({
   status: z.enum(["pending", "confirmed", "delivered", "cancelled"]),
 });
 
+type OrderStatus = z.infer<typeof statusSchema>["status"];
+
+// pending → confirmed → delivered, and pending/confirmed → cancelled.
+// delivered and cancelled are final.
+export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["delivered", "cancelled"],
+  delivered: [],
+  cancelled: [],
+};
+
 ordersRouter.patch("/:id/status", requireRole("admin"), async (req, res) => {
   const parsed = statusSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
-  const order = await prisma.order.update({
+  const next = parsed.data.status;
+
+  const current = await prisma.order.findUnique({
     where: { id: req.params.id },
-    data: { status: parsed.data.status },
+    select: { status: true },
   });
+  if (!current) return res.status(404).json({ error: "Order not found" });
+  if (!ALLOWED_TRANSITIONS[current.status].includes(next)) {
+    return res.status(409).json({ error: `Cannot change order from ${current.status} to ${next}` });
+  }
+
+  // Conditional on the status we checked, so two admins can't both apply a
+  // transition from the same starting state.
+  const { count } = await prisma.order.updateMany({
+    where: { id: req.params.id, status: current.status },
+    data: { status: next },
+  });
+  if (count === 0) {
+    return res.status(409).json({ error: "Order status changed meanwhile; reload and try again" });
+  }
+  const order = await prisma.order.findUniqueOrThrow({ where: { id: req.params.id } });
   res.json({ order });
 });
