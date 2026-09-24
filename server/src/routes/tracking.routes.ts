@@ -22,14 +22,21 @@ trackingRouter.patch("/location", requireRole("sales_employee"), async (req, res
   const { lat, lng, accuracy } = parsed.data;
   const userId = req.user!.sub;
 
-  const [location] = await prisma.$transaction([
-    prisma.employeeLocation.upsert({
-      where: { userId },
-      update: { lat, lng, accuracy, onDuty: true },
-      create: { userId, lat, lng, accuracy, onDuty: true },
-    }),
-    prisma.locationHistory.create({ data: { userId, lat, lng, accuracy } }),
-  ]);
+  // Only on-duty employees may move their pin. A background tick that lands
+  // after POST /duty {onDuty:false} must not flip them back on duty, so the
+  // onDuty check and the write are one conditional update.
+  const location = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.employeeLocation.updateMany({
+      where: { userId, onDuty: true },
+      data: { lat, lng, accuracy },
+    });
+    if (count === 0) return null;
+    await tx.locationHistory.create({ data: { userId, lat, lng, accuracy } });
+    return tx.employeeLocation.findUniqueOrThrow({ where: { userId } });
+  });
+  if (!location) {
+    return res.status(409).json({ error: "Not on duty" });
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: userId },

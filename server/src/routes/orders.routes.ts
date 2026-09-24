@@ -38,9 +38,11 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
   }
 
   const variantIds = items.map((i) => i.variantId);
-  const variants = await prisma.productVariant.findMany({ where: { id: { in: variantIds } } });
+  const variants = await prisma.productVariant.findMany({
+    where: { id: { in: variantIds }, active: true, product: { active: true } },
+  });
   if (variants.length !== new Set(variantIds).size) {
-    return res.status(400).json({ error: "One or more product sizes not found" });
+    return res.status(400).json({ error: "One or more product sizes are not found or no longer available" });
   }
 
   const priceById = new Map(variants.map((v) => [v.id, v.price]));

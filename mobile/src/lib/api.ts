@@ -56,7 +56,8 @@ export async function api<T>(path: string, options: RequestInit = {}, retry = tr
     },
   });
 
-  if (res.status === 401 && retry) {
+  // A 401 from /api/auth/* means bad credentials, not an expired session.
+  if (res.status === 401 && retry && !path.startsWith("/api/auth/")) {
     const newToken = await tryRefresh();
     if (newToken) {
       return api<T>(path, options, false);
