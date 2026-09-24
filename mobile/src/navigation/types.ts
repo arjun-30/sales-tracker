@@ -7,4 +7,5 @@ export type TabParamList = {
   Home: undefined;
   Orders: undefined;
   Visits: undefined;
+  Catalog: undefined;
 };

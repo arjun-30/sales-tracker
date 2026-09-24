@@ -10,6 +10,7 @@ import HomeScreen from "../screens/HomeScreen";
 import OrdersScreen from "../screens/OrdersScreen";
 import NewOrderScreen from "../screens/NewOrderScreen";
 import VisitsScreen from "../screens/VisitsScreen";
+import CatalogScreen from "../screens/CatalogScreen";
 import type { RootStackParamList, TabParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -21,6 +22,7 @@ function Tabs() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
       <Tab.Screen name="Visits" component={VisitsScreen} />
+      <Tab.Screen name="Catalog" component={CatalogScreen} options={{ title: "Price List" }} />
     </Tab.Navigator>
   );
 }
