@@ -1,0 +1,7 @@
+# Caddy gets and renews the HTTPS certificate for API_DOMAIN automatically.
+# Point the domain's A record at this server before starting.
+{$API_DOMAIN} {
+	encode gzip
+	# Socket.io upgrades to WebSocket through here; Caddy proxies that natively.
+	reverse_proxy api:4000
+}

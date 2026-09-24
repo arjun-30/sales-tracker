@@ -12,3 +12,4 @@ build/
 android/
 ios/
 .DS_Store
+.env.production

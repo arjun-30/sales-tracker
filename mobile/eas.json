@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 18.0.0",
-    "appVersionSource": "local"
+    "appVersionSource": "remote"
   },
   "build": {
     "preview": {
@@ -10,7 +10,23 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://172.20.10.2:4000"
+        "EXPO_PUBLIC_API_URL": "http://192.168.0.100:4010",
+        "ALLOW_CLEARTEXT_HTTP": "1"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.CHANGE-ME.in"
+      }
+    },
+    "production-playstore": {
+      "extends": "production",
+      "android": {
+        "buildType": "app-bundle"
       }
     }
   },
