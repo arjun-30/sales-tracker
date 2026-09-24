@@ -4,6 +4,7 @@ import express, { type ErrorRequestHandler } from "express";
 import "express-async-errors";
 import { Prisma } from "@prisma/client";
 import cors from "cors";
+import { config } from "./config";
 import { authRouter } from "./routes/auth.routes";
 import { districtsRouter } from "./routes/districts.routes";
 import { employeesRouter } from "./routes/employees.routes";
@@ -14,8 +15,16 @@ import { visitsRouter } from "./routes/visits.routes";
 import { reportsRouter } from "./routes/reports.routes";
 
 export const app = express();
-app.use(cors({ origin: process.env.CORS_ORIGIN ?? "*" }));
+app.set("trust proxy", config.trustProxy);
+app.disable("x-powered-by");
+app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json());
+// Money columns are Prisma Decimals, which JSON.stringify would turn into
+// strings. Send them as numbers so the clients keep working unchanged.
+app.set("json replacer", function (this: Record<string, unknown>, key: string, value: unknown) {
+  const raw = this[key];
+  return Prisma.Decimal.isDecimal(raw) ? (raw as Prisma.Decimal).toNumber() : value;
+});
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

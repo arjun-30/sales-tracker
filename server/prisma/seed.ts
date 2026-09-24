@@ -56,8 +56,12 @@ async function main() {
 
   const chennai = await prisma.district.findUniqueOrThrow({ where: { name: "Chennai" } });
 
+  const isProduction = process.env.NODE_ENV === "production";
   const adminPhone = process.env.SEED_ADMIN_PHONE ?? "9999999999";
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "admin123";
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? (isProduction ? "" : "admin123");
+  if (isProduction && adminPassword.length < 8) {
+    throw new Error("Set SEED_ADMIN_PASSWORD (8+ characters) to seed a production database");
+  }
   const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
 
   await prisma.user.upsert({
@@ -71,22 +75,29 @@ async function main() {
       districtId: chennai.id,
     },
   });
-  console.log(`Seeded admin user (phone: ${adminPhone}, password: ${adminPassword})`);
+  console.log(
+    isProduction
+      ? `Seeded admin user (phone: ${adminPhone})`
+      : `Seeded admin user (phone: ${adminPhone}, password: ${adminPassword})`
+  );
 
-  const testEmpPhone = "9000000001";
-  const testEmpPasswordHash = await bcrypt.hash("employee123", 10);
-  await prisma.user.upsert({
-    where: { phone: testEmpPhone },
-    update: {},
-    create: {
-      name: "Test Sales Employee",
-      phone: testEmpPhone,
-      passwordHash: testEmpPasswordHash,
-      role: "sales_employee",
-      districtId: chennai.id,
-    },
-  });
-  console.log(`Seeded test sales employee (phone: ${testEmpPhone}, password: employee123)`);
+  // The shared test login must never exist in production.
+  if (!isProduction) {
+    const testEmpPhone = "9000000001";
+    const testEmpPasswordHash = await bcrypt.hash("employee123", 10);
+    await prisma.user.upsert({
+      where: { phone: testEmpPhone },
+      update: {},
+      create: {
+        name: "Test Sales Employee",
+        phone: testEmpPhone,
+        passwordHash: testEmpPasswordHash,
+        role: "sales_employee",
+        districtId: chennai.id,
+      },
+    });
+    console.log(`Seeded test sales employee (phone: ${testEmpPhone}, password: employee123)`);
+  }
 
   type VariantTemplate = "LIQUID" | "POWDER" | "SINGLE";
 

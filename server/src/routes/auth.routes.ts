@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../lib/jwt";
 import { requireAuth } from "../middleware/auth";
+import { loginPerIpLimiter, loginPerPhoneLimiter } from "../middleware/rateLimit";
 
 export const authRouter = Router();
 
@@ -12,7 +13,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-authRouter.post("/login", async (req, res) => {
+authRouter.post("/login", loginPerIpLimiter, loginPerPhoneLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "phone and password are required" });

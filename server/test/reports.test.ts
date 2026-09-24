@@ -44,7 +44,7 @@ describe("reports", () => {
       _sum: { totalAmount: true },
     });
     expect(res.body.totalOrders).toBe(direct._count);
-    expect(res.body.totalSales).toBe(direct._sum.totalAmount);
+    expect(res.body.totalSales).toBe(Number(direct._sum.totalAmount));
     expect(res.body.totalOrders).toBe(2);
     expect(res.body.totalSales).toBe(2500);
   });

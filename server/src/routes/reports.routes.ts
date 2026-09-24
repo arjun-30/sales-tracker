@@ -137,7 +137,7 @@ reportsRouter.get("/summary", async (req, res) => {
   const categoryAgg = new Map<string, number>();
   for (const item of orderItemsForAgg) {
     const product = item.variant.product;
-    const revenue = item.quantity * item.unitPrice;
+    const revenue = item.unitPrice.mul(item.quantity).toNumber();
     const existing = productAgg.get(product.id) ?? {
       name: product.name,
       category: product.category,
@@ -169,7 +169,7 @@ reportsRouter.get("/summary", async (req, res) => {
   });
   const employeeNameById = new Map(employeeUsers.map((e) => [e.id, e.name]));
   const ordersCountById = new Map(ordersByEmployee.map((o) => [o.employeeId, o._count]));
-  const salesById = new Map(ordersByEmployee.map((o) => [o.employeeId, o._sum.totalAmount ?? 0]));
+  const salesById = new Map(ordersByEmployee.map((o) => [o.employeeId, o._sum.totalAmount?.toNumber() ?? 0]));
   const visitsCountById = new Map(visitsByEmployee.map((v) => [v.employeeId, v._count]));
   const employeeLeaderboard = [...employeeIds]
     .map((id) => {
@@ -211,13 +211,13 @@ reportsRouter.get("/summary", async (req, res) => {
 
   res.json({
     totalOrders: orderAgg._count,
-    totalSales: orderAgg._sum.totalAmount ?? 0,
+    totalSales: orderAgg._sum.totalAmount?.toNumber() ?? 0,
     totalVisits: visitCount,
     activeEmployees,
     salesByDistrict: ordersByDistrict.map((d) => ({
       districtId: d.districtId,
       districtName: districtNameById.get(d.districtId) ?? "Unknown",
-      totalSales: d._sum.totalAmount ?? 0,
+      totalSales: d._sum.totalAmount?.toNumber() ?? 0,
       orderCount: d._count,
     })),
     ordersOverTime: ordersByDay.map((r) => ({ day: r.day, total: r.total, count: Number(r.count) })),
@@ -231,7 +231,7 @@ reportsRouter.get("/summary", async (req, res) => {
       shopName: o.shopName,
       employeeName: o.employee.name,
       districtName: o.district.name,
-      totalAmount: o.totalAmount,
+      totalAmount: o.totalAmount.toNumber(),
       createdAt: o.createdAt,
       isStuck: o.createdAt < stuckCutoff,
     })),

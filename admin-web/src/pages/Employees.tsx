@@ -12,6 +12,7 @@ export function Employees() {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -51,6 +52,21 @@ export function Employees() {
       setError(err instanceof Error ? err.message : "Could not create employee");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function resetPassword(emp: Employee) {
+    const password = window.prompt(`New password for ${emp.name} (at least 4 characters):`);
+    if (password === null) return;
+    if (password.length < 4) {
+      setNotice({ tone: "error", text: "Password must be at least 4 characters." });
+      return;
+    }
+    try {
+      await api(`/api/employees/${emp.id}/password`, { method: "POST", body: JSON.stringify({ password }) });
+      setNotice({ tone: "ok", text: `Password reset for ${emp.name}. Share the new password with them directly.` });
+    } catch (err) {
+      setNotice({ tone: "error", text: err instanceof Error ? err.message : "Could not reset the password" });
     }
   }
 
@@ -105,6 +121,16 @@ export function Employees() {
         </Card>
       )}
 
+      {notice && (
+        <div
+          className={`rounded-lg px-4 py-3 text-sm ${
+            notice.tone === "ok" ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
+          }`}
+        >
+          {notice.text}
+        </div>
+      )}
+
       <Card className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -138,7 +164,10 @@ export function Employees() {
                     {emp.employeeLocation?.onDuty ? "on duty" : "off duty"}
                   </Badge>
                 </td>
-                <td className="px-5 py-3 text-right">
+                <td className="whitespace-nowrap px-5 py-3 text-right">
+                  <Button variant="ghost" onClick={() => resetPassword(emp)}>
+                    Reset password
+                  </Button>
                   <Button variant="ghost" onClick={() => toggleActive(emp)}>
                     {emp.active ? "Disable" : "Enable"}
                   </Button>

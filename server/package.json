@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prune:locations": "tsx scripts/pruneLocationHistory.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
@@ -20,6 +21,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-async-errors": "^3.1.1",
+    "express-rate-limit": "^8.7.0",
     "jsonwebtoken": "^9.0.2",
     "socket.io": "^4.8.0",
     "zod": "^3.23.8"

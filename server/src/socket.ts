@@ -1,12 +1,13 @@
 import type { Server as HttpServer } from "http";
 import { Server, type Socket } from "socket.io";
 import { verifyAccessToken } from "./lib/jwt";
+import { config } from "./config";
 
 let io: Server | undefined;
 
 export function initSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
-    cors: { origin: process.env.CORS_ORIGIN ?? "*" },
+    cors: { origin: config.corsOrigin },
   });
 
   io.use((socket: Socket, next) => {

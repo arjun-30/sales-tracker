@@ -46,6 +46,34 @@ describe("products and employees", () => {
     expect(res.status).toBe(409);
   });
 
+  it("FR-EMP-03 admin resets an employee's password; only the new one works", async () => {
+    const res = await api()
+      .post(`/api/employees/${f.empA.id}/password`)
+      .set(bearer(admin))
+      .send({ password: "fresh-pass" });
+    expect(res.status).toBe(204);
+    await expect(login("9000000001", "fresh-pass")).resolves.toBeDefined();
+    const old = await api().post("/api/auth/login").send({ phone: "9000000001", password: "secret123" });
+    expect(old.status).toBe(401);
+  });
+
+  it("FR-EMP-03 rejects short passwords, admin accounts and employee tokens", async () => {
+    const short = await api().post(`/api/employees/${f.empA.id}/password`).set(bearer(admin)).send({ password: "abc" });
+    expect(short.status).toBe(400);
+    const onAdmin = await api().post(`/api/employees/${f.admin.id}/password`).set(bearer(admin)).send({ password: "abcd" });
+    expect(onAdmin.status).toBe(404);
+    const emp = (await login("9000000001")).accessToken;
+    const byEmp = await api().post(`/api/employees/${f.empB.id}/password`).set(bearer(emp)).send({ password: "abcd" });
+    expect(byEmp.status).toBe(403);
+  });
+
+  it("updating an employee never returns the password hash", async () => {
+    const res = await api().patch(`/api/employees/${f.empA.id}`).set(bearer(admin)).send({ name: "Renamed" });
+    expect(res.status).toBe(200);
+    expect(res.body.employee.name).toBe("Renamed");
+    expect(res.body.employee.passwordHash).toBeUndefined();
+  });
+
   it("FR-EMP-01 creates an employee who can then log in", async () => {
     const res = await api()
       .post("/api/employees")

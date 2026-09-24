@@ -61,14 +61,54 @@ const updateSchema = z.object({
   active: z.boolean().optional(),
 });
 
+// Never send passwordHash back to a client.
+const publicEmployeeFields = {
+  id: true,
+  name: true,
+  phone: true,
+  active: true,
+  districtId: true,
+  district: true,
+  createdAt: true,
+} as const;
+
+// These routes manage sales employees only; admin accounts are out of reach.
+async function findEmployee(id: string) {
+  return prisma.user.findFirst({ where: { id, role: "sales_employee" }, select: { id: true } });
+}
+
 employeesRouter.patch("/:id", async (req, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
+  if (!(await findEmployee(req.params.id))) {
+    return res.status(404).json({ error: "Employee not found" });
+  }
   const employee = await prisma.user.update({
     where: { id: req.params.id },
     data: parsed.data,
+    select: publicEmployeeFields,
   });
   res.json({ employee });
+});
+
+const passwordSchema = z.object({ password: z.string().min(4) });
+
+// FR-EMP-03: an admin sets a new password when an employee forgets theirs.
+// A phone that is already logged in stays logged in: refresh tokens are not
+// revocable yet (System Design 3.1). To lock someone out, deactivate them.
+employeesRouter.post("/:id/password", async (req, res) => {
+  const parsed = passwordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Password must be at least 4 characters" });
+  }
+  if (!(await findEmployee(req.params.id))) {
+    return res.status(404).json({ error: "Employee not found" });
+  }
+  await prisma.user.update({
+    where: { id: req.params.id },
+    data: { passwordHash: await bcrypt.hash(parsed.data.password, 10) },
+  });
+  res.status(204).end();
 });

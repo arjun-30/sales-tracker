@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { requireAuth, requireRole } from "../middleware/auth";
 
@@ -51,7 +52,8 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
     quantity: i.quantity,
     unitPrice: priceById.get(i.variantId)!,
   }));
-  const totalAmount = orderItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+  // Decimal arithmetic, so paise never drift the way floating point does.
+  const totalAmount = orderItems.reduce((sum, i) => sum.add(i.unitPrice.mul(i.quantity)), new Prisma.Decimal(0));
 
   const order = await prisma.order.create({
     data: {

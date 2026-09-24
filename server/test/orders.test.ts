@@ -58,8 +58,22 @@ describe("placing orders", () => {
     const id = await newOrderId();
     await prisma.productVariant.update({ where: { id: f.v1L.id }, data: { price: 999 } });
     const order = await prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
-    expect(order.totalAmount).toBe(500);
-    expect(order.items[0].unitPrice).toBe(500);
+    expect(Number(order.totalAmount)).toBe(500);
+    expect(Number(order.items[0].unitPrice)).toBe(500);
+  });
+
+  it("NFR-REL-02 totals are exact to the paisa (no floating-point drift)", async () => {
+    await prisma.productVariant.update({ where: { id: f.v1L.id }, data: { price: "0.10" } });
+    await prisma.productVariant.update({ where: { id: f.v4L.id }, data: { price: "0.20" } });
+    const res = await placeOrder([
+      { variantId: f.v1L.id, quantity: 1 },
+      { variantId: f.v4L.id, quantity: 1 },
+    ]);
+    // 0.1 + 0.2 is 0.30000000000000004 in floating point.
+    expect(res.body.order.totalAmount).toBe(0.3);
+    expect(typeof res.body.order.items[0].unitPrice).toBe("number");
+    const stored = await prisma.order.findUniqueOrThrow({ where: { id: res.body.order.id } });
+    expect(stored.totalAmount.toString()).toBe("0.3");
   });
 
   it("TC-18 an inactive size is rejected with 400", async () => {
