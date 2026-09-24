@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { connectSocket } from "../lib/socket";
 import type { District, EmployeeLocation } from "../lib/types";
 import { Select } from "../components/ui/Input";
-import { Card } from "../components/ui/Card";
+import { Card, PageHeader } from "../components/ui/Card";
 
 const TAMIL_NADU_CENTER = { lat: 10.8284, lng: 78.7638 };
 const containerStyle = { width: "100%", height: "calc(100vh - 3rem)" };
@@ -249,9 +249,11 @@ export function LiveMap() {
   }, [selectedDistrictName, geoReady]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900">Live Map</h1>
+    <div className="space-y-4">
+      <PageHeader
+        title="Live Map"
+        description="On-duty salespeople update every 25 seconds. Grey markers haven't reported for over 10 minutes."
+        actions={
         <div className="w-56">
           <Select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)}>
             <option value="">All districts</option>
@@ -262,7 +264,8 @@ export function LiveMap() {
             ))}
           </Select>
         </div>
-      </div>
+        }
+      />
 
       {!import.meta.env.VITE_GOOGLE_MAPS_API_KEY && (
         <Card className="border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">

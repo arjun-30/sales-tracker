@@ -59,7 +59,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "@react-native-vector-icons/ionicons"
     ],
     "extra": {
       "eas": {

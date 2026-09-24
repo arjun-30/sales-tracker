@@ -2,23 +2,30 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../lib/api";
 import { getCurrentPosition } from "../lib/locationTask";
 import type { Order, Product } from "../lib/types";
 import type { RootStackParamList } from "../navigation/types";
+import { Button, Card, Field, SectionLabel } from "../components/ui";
+import { colors, formatINR, radius } from "../theme";
 
 interface CartLine {
   variantId: string;
   productName: string;
+  shortCode: string;
   sizeLabel: string;
   unitPrice: number;
   quantity: number;
@@ -30,7 +37,7 @@ export default function NewOrderScreen() {
   const [looking, setLooking] = useState(false);
   const [found, setFound] = useState<Product | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [sizeQuantities, setSizeQuantities] = useState<Record<string, string>>({});
+  const [draftQty, setDraftQty] = useState<Record<string, number>>({});
   const [cart, setCart] = useState<CartLine[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -47,7 +54,7 @@ export default function NewOrderScreen() {
     try {
       const data = await api<{ product: Product }>(`/api/products/lookup/${encodeURIComponent(trimmed)}`);
       setFound(data.product);
-      setSizeQuantities({});
+      setDraftQty({});
     } catch {
       setNotFound(true);
     } finally {
@@ -57,45 +64,44 @@ export default function NewOrderScreen() {
 
   function addToCart() {
     if (!found) return;
-    const lines: CartLine[] = [];
-    for (const v of found.variants) {
-      const qty = Number(sizeQuantities[v.id] ?? 0);
-      if (qty > 0) {
-        lines.push({
-          variantId: v.id,
-          productName: found.name,
-          sizeLabel: v.sizeLabel,
-          unitPrice: v.price,
-          quantity: qty,
-        });
-      }
-    }
+    const lines: CartLine[] = found.variants
+      .filter((v) => (draftQty[v.id] ?? 0) > 0)
+      .map((v) => ({
+        variantId: v.id,
+        productName: found.name,
+        shortCode: found.shortCode,
+        sizeLabel: v.sizeLabel,
+        unitPrice: v.price,
+        quantity: draftQty[v.id],
+      }));
     if (lines.length === 0) {
-      Alert.alert("No quantity", "Enter a quantity for at least one size.");
+      Alert.alert("No quantity", "Use + to add at least one pack.");
       return;
     }
     setCart((prev) => {
       const next = [...prev];
       for (const line of lines) {
-        const existingIdx = next.findIndex((l) => l.variantId === line.variantId);
-        if (existingIdx >= 0) {
-          next[existingIdx] = { ...next[existingIdx], quantity: next[existingIdx].quantity + line.quantity };
-        } else {
-          next.push(line);
-        }
+        const i = next.findIndex((l) => l.variantId === line.variantId);
+        if (i >= 0) next[i] = { ...next[i], quantity: next[i].quantity + line.quantity };
+        else next.push(line);
       }
       return next;
     });
     setFound(null);
     setCode("");
-    setSizeQuantities({});
+    setDraftQty({});
   }
 
-  function removeLine(variantId: string) {
-    setCart((prev) => prev.filter((l) => l.variantId !== variantId));
+  function setLineQty(variantId: string, quantity: number) {
+    setCart((prev) =>
+      quantity <= 0
+        ? prev.filter((l) => l.variantId !== variantId)
+        : prev.map((l) => (l.variantId === variantId ? { ...l, quantity } : l))
+    );
   }
 
   const total = useMemo(() => cart.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0), [cart]);
+  const units = useMemo(() => cart.reduce((sum, l) => sum + l.quantity, 0), [cart]);
 
   async function handleSubmit() {
     if (!customerName.trim()) {
@@ -110,7 +116,7 @@ export default function NewOrderScreen() {
     setSubmitting(true);
     try {
       const pos = await getCurrentPosition();
-      await api<{ order: Order }>("/api/orders", {
+      const { order } = await api<{ order: Order }>("/api/orders", {
         method: "POST",
         body: JSON.stringify({
           customerName: customerName.trim(),
@@ -122,6 +128,7 @@ export default function NewOrderScreen() {
           items: cart.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
         }),
       });
+      Alert.alert("Order placed", `${order.customerName} · ${formatINR(order.totalAmount)}`);
       navigation.goBack();
     } catch (err) {
       Alert.alert("Error", err instanceof Error ? err.message : "Failed to create order");
@@ -131,189 +138,217 @@ export default function NewOrderScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={cart}
-        keyExtractor={(item) => item.variantId}
-        contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 160 }}
-        ListHeaderComponent={
-          <View style={{ gap: 10, marginBottom: 12 }}>
-            <TextInput
-              style={styles.input}
-              placeholder="Customer name *"
-              value={customerName}
-              onChangeText={setCustomerName}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Customer phone"
+    <SafeAreaView style={styles.safe} edges={["bottom"]}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <SectionLabel>Customer</SectionLabel>
+          <Card style={styles.section}>
+            <Field icon="person-outline" placeholder="Customer name *" value={customerName} onChangeText={setCustomerName} />
+            <Field
+              icon="call-outline"
+              placeholder="Phone (optional)"
               keyboardType="phone-pad"
               value={customerPhone}
               onChangeText={setCustomerPhone}
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Shop name"
-              value={shopName}
-              onChangeText={setShopName}
-            />
-            <TextInput style={styles.input} placeholder="Notes" value={notes} onChangeText={setNotes} />
+            <Field icon="storefront-outline" placeholder="Shop name (optional)" value={shopName} onChangeText={setShopName} />
+            <Field icon="create-outline" placeholder="Notes (optional)" value={notes} onChangeText={setNotes} />
+          </Card>
 
-            <Text style={styles.sectionLabel}>Add a product</Text>
+          <SectionLabel>Add products</SectionLabel>
+          <Card style={styles.section}>
             <View style={styles.codeRow}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Type product code, e.g. RPE"
-                autoCapitalize="characters"
-                value={code}
-                onChangeText={setCode}
-                onSubmitEditing={handleLookup}
-              />
-              <TouchableOpacity style={styles.lookupButton} onPress={handleLookup} disabled={looking}>
-                {looking ? <ActivityIndicator color="#fff" /> : <Text style={styles.lookupButtonText}>Find</Text>}
+              <View style={{ flex: 1 }}>
+                <Field
+                  icon="search-outline"
+                  placeholder="Product code, e.g. RPE"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  value={code}
+                  onChangeText={(t) => {
+                    setCode(t);
+                    setNotFound(false);
+                  }}
+                  onSubmitEditing={handleLookup}
+                  returnKeyType="search"
+                />
+              </View>
+              <TouchableOpacity style={styles.findButton} onPress={handleLookup} disabled={looking || !code.trim()}>
+                {looking ? <ActivityIndicator color="#fff" /> : <Text style={styles.findText}>Find</Text>}
               </TouchableOpacity>
             </View>
 
-            {notFound && <Text style={styles.errorText}>No product found for that code.</Text>}
+            {notFound ? (
+              <View style={styles.notFound}>
+                <Ionicons name="alert-circle-outline" size={18} color={colors.danger} />
+                <Text style={styles.notFoundText}>No active product with that code. Check the Price List tab.</Text>
+              </View>
+            ) : null}
 
-            {found && (
-              <View style={styles.foundCard}>
-                <Text style={styles.foundName}>
-                  {found.name} <Text style={styles.foundCode}>({found.shortCode})</Text>
-                </Text>
+            {found ? (
+              <View style={styles.found}>
+                <View style={styles.foundHeader}>
+                  <Text style={styles.foundName}>{found.name}</Text>
+                  <Text style={styles.code}>{found.shortCode}</Text>
+                </View>
                 {found.variants.map((v) => (
                   <View key={v.id} style={styles.sizeRow}>
-                    <Text style={styles.sizeLabel}>{v.sizeLabel}</Text>
-                    <Text style={styles.sizePrice}>₹{v.price}</Text>
-                    <TextInput
-                      style={styles.qtyInput}
-                      placeholder="0"
-                      keyboardType="numeric"
-                      value={sizeQuantities[v.id] ?? ""}
-                      onChangeText={(text) =>
-                        setSizeQuantities((prev) => ({ ...prev, [v.id]: text.replace(/[^0-9]/g, "") }))
-                      }
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.sizeLabel}>{v.sizeLabel}</Text>
+                      <Text style={v.price > 0 ? styles.sizePrice : styles.noPrice}>
+                        {v.price > 0 ? formatINR(v.price) : "Price not set"}
+                      </Text>
+                    </View>
+                    <Stepper
+                      value={draftQty[v.id] ?? 0}
+                      onChange={(q) => setDraftQty((prev) => ({ ...prev, [v.id]: q }))}
                     />
                   </View>
                 ))}
-                <TouchableOpacity style={styles.addButton} onPress={addToCart}>
-                  <Text style={styles.addButtonText}>Add to order</Text>
-                </TouchableOpacity>
+                <Button label="Add to order" icon="cart-outline" variant="success" onPress={addToCart} />
               </View>
-            )}
+            ) : null}
+          </Card>
 
-            {cart.length > 0 && <Text style={styles.sectionLabel}>Order items</Text>}
+          {cart.length > 0 ? (
+            <>
+              <SectionLabel>Order items</SectionLabel>
+              <Card style={{ paddingVertical: 4 }}>
+                {cart.map((l, i) => (
+                  <View key={l.variantId} style={[styles.cartRow, i > 0 && styles.cartDivider]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cartName} numberOfLines={1}>
+                        {l.productName}
+                      </Text>
+                      <Text style={styles.cartMeta}>
+                        {l.shortCode} · {l.sizeLabel} · {formatINR(l.unitPrice)} each
+                      </Text>
+                      <Text style={styles.cartLineTotal}>{formatINR(l.unitPrice * l.quantity)}</Text>
+                    </View>
+                    <Stepper value={l.quantity} onChange={(q) => setLineQty(l.variantId, q)} removable />
+                  </View>
+                ))}
+              </Card>
+            </>
+          ) : null}
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.footerLabel}>
+              {units} {units === 1 ? "unit" : "units"}
+            </Text>
+            <Text style={styles.footerTotal}>{formatINR(total)}</Text>
           </View>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.cartRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.productName}>
-                {item.productName} ({item.sizeLabel})
-              </Text>
-              <Text style={styles.productMeta}>
-                {item.quantity} × ₹{item.unitPrice} = ₹{(item.quantity * item.unitPrice).toFixed(2)}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => removeLine(item.variantId)}>
-              <Text style={styles.removeText}>Remove</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          <Button
+            label="Place order"
+            icon="checkmark-circle"
+            onPress={handleSubmit}
+            loading={submitting}
+            disabled={cart.length === 0}
+            style={{ flex: 1.3 }}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+function Stepper({
+  value,
+  onChange,
+  removable,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  // In the cart, going below 1 removes the line, so show a bin instead of a minus.
+  removable?: boolean;
+}) {
+  return (
+    <View style={styles.stepper}>
+      <TouchableOpacity
+        style={styles.stepBtn}
+        onPress={() => onChange(Math.max(0, value - 1))}
+        accessibilityLabel="Decrease"
+      >
+        <Ionicons
+          name={removable && value <= 1 ? "trash-outline" : "remove"}
+          size={20}
+          color={removable && value <= 1 ? colors.danger : colors.text}
+        />
+      </TouchableOpacity>
+      <TextInput
+        style={styles.stepValue}
+        keyboardType="number-pad"
+        value={value ? String(value) : ""}
+        placeholder="0"
+        placeholderTextColor={colors.textFaint}
+        onChangeText={(t) => onChange(Number(t.replace(/[^0-9]/g, "") || 0))}
       />
-
-      <View style={styles.footer}>
-        <Text style={styles.totalText}>Total: ₹{total.toFixed(2)}</Text>
-        <TouchableOpacity
-          style={[styles.submitButton, submitting && styles.submitDisabled]}
-          onPress={handleSubmit}
-          disabled={submitting}
-        >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitText}>Submit order</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.stepBtn} onPress={() => onChange(value + 1)} accessibilityLabel="Increase">
+        <Ionicons name="add" size={20} color={colors.text} />
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
-  sectionLabel: { fontSize: 13, fontWeight: "700", color: "#6b7280", marginTop: 4 },
-  codeRow: { flexDirection: "row", gap: 8 },
-  lookupButton: {
-    backgroundColor: "#1d4ed8",
-    borderRadius: 8,
-    paddingHorizontal: 18,
+  safe: { flex: 1, backgroundColor: colors.background },
+  content: { padding: 16, gap: 12, paddingBottom: 32 },
+  section: { gap: 12 },
+  codeRow: { flexDirection: "row", gap: 10, alignItems: "flex-end" },
+  findButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    height: 50,
+    paddingHorizontal: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-  lookupButtonText: { color: "#fff", fontWeight: "700" },
-  errorText: { color: "#dc2626", fontSize: 13 },
-  foundCard: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    padding: 12,
-    gap: 8,
+  findText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  notFound: { flexDirection: "row", gap: 8, alignItems: "center" },
+  notFoundText: { color: colors.danger, fontSize: 13, flex: 1 },
+  found: { gap: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
+  foundHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  foundName: { fontSize: 16, fontWeight: "700", color: colors.text, flexShrink: 1 },
+  code: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.primary,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  foundName: { fontSize: 15, fontWeight: "700" },
-  foundCode: { fontWeight: "400", color: "#6b7280" },
-  sizeRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  sizeLabel: { width: 48, fontWeight: "600" },
-  sizePrice: { flex: 1, color: "#6b7280", fontSize: 13 },
-  qtyInput: {
-    width: 60,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    textAlign: "center",
-    paddingVertical: 8,
-  },
-  addButton: {
-    backgroundColor: "#16a34a",
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  addButtonText: { color: "#fff", fontWeight: "700" },
-  cartRow: {
+  sizeRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  sizeLabel: { fontSize: 15, fontWeight: "700", color: colors.text },
+  sizePrice: { fontSize: 13, color: colors.textMuted },
+  noPrice: { fontSize: 12, color: colors.textFaint, fontStyle: "italic" },
+  stepper: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    padding: 12,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    overflow: "hidden",
   },
-  productName: { fontSize: 15, fontWeight: "600" },
-  productMeta: { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  removeText: { color: "#dc2626", fontWeight: "600", fontSize: 13 },
+  stepBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
+  stepValue: { width: 48, textAlign: "center", fontSize: 16, fontWeight: "700", color: colors.text, paddingVertical: 0 },
+  cartRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
+  cartDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  cartName: { fontSize: 15, fontWeight: "700", color: colors.text },
+  cartMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  cartLineTotal: { fontSize: 14, fontWeight: "700", color: colors.text, marginTop: 4 },
   footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    padding: 16,
-    gap: 10,
+    borderTopColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  totalText: { fontSize: 16, fontWeight: "700" },
-  submitButton: { backgroundColor: "#1d4ed8", borderRadius: 8, paddingVertical: 14, alignItems: "center" },
-  submitDisabled: { opacity: 0.6 },
-  submitText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  footerLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
+  footerTotal: { fontSize: 22, fontWeight: "800", color: colors.text },
 });

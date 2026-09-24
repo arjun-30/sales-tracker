@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { api } from "../lib/api";
 import type { Product, ProductVariant } from "../lib/types";
-import { Card } from "../components/ui/Card";
+import { Card, PageHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label } from "../components/ui/Input";
 
@@ -93,14 +93,15 @@ export function Products() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900">Product Catalog</h1>
-        <Button onClick={() => setShowForm((s) => !s)}>{showForm ? "Cancel" : "Add product"}</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Product Catalog"
+        description="Products, pack sizes and prices. Salespeople see active items in the app's Price List."
+        actions={<Button onClick={() => setShowForm((s) => !s)}>{showForm ? "Cancel" : "Add product"}</Button>}
+      />
 
       {showForm && (
-        <Card className="p-4">
+        <Card className="p-5">
           <form onSubmit={handleCreate} className="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <div>
               <Label>Name</Label>
@@ -131,31 +132,31 @@ export function Products() {
 
       <Card className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-medium uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-2">Code</th>
-              <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2">Category</th>
-              <th className="px-4 py-2">Sizes</th>
-              <th className="px-4 py-2" />
+              <th className="px-5 py-3 font-medium">Code</th>
+              <th className="px-5 py-3 font-medium">Name</th>
+              <th className="px-5 py-3 font-medium">Category</th>
+              <th className="px-5 py-3 font-medium">Sizes</th>
+              <th className="px-5 py-3" />
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td className="px-4 py-6 text-center text-slate-400" colSpan={5}>
+                <td className="px-5 py-10 text-center text-sm text-slate-400" colSpan={5}>
                   Loading…
                 </td>
               </tr>
             )}
             {products.map((p) => (
               <Fragment key={p.id}>
-                <tr className="border-b border-slate-100">
-                  <td className="px-4 py-2 font-mono font-semibold text-slate-800">{p.shortCode}</td>
-                  <td className="px-4 py-2 font-medium text-slate-800">{p.name}</td>
-                  <td className="px-4 py-2">{p.category}</td>
-                  <td className="px-4 py-2 text-slate-500">{p.variants.length} size(s)</td>
-                  <td className="px-4 py-2 text-right">
+                <tr className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70">
+                  <td className="px-5 py-3 font-mono font-semibold text-slate-800">{p.shortCode}</td>
+                  <td className="px-5 py-3 font-medium text-slate-800">{p.name}</td>
+                  <td className="px-5 py-3">{p.category}</td>
+                  <td className="px-5 py-3 text-slate-500">{p.variants.length} size(s)</td>
+                  <td className="px-5 py-3 text-right">
                     <Button
                       variant="secondary"
                       className="px-2 py-1 text-xs"

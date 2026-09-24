@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../lib/api";
 import type { District, Employee } from "../lib/types";
-import { Card, Badge } from "../components/ui/Card";
+import { Card, Badge, PageHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select } from "../components/ui/Input";
 
@@ -63,14 +63,15 @@ export function Employees() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900">Sales Employees</h1>
-        <Button onClick={() => setShowForm((s) => !s)}>{showForm ? "Cancel" : "Add employee"}</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Sales Employees"
+        description="Field staff accounts, their districts and whether they're on duty."
+        actions={<Button onClick={() => setShowForm((s) => !s)}>{showForm ? "Cancel" : "Add employee"}</Button>}
+      />
 
       {showForm && (
-        <Card className="p-4">
+        <Card className="p-5">
           <form onSubmit={handleCreate} className="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <div>
               <Label>Name</Label>
@@ -106,38 +107,38 @@ export function Employees() {
 
       <Card className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-medium uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2">Phone</th>
-              <th className="px-4 py-2">District</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Duty</th>
-              <th className="px-4 py-2"></th>
+              <th className="px-5 py-3 font-medium">Name</th>
+              <th className="px-5 py-3 font-medium">Phone</th>
+              <th className="px-5 py-3 font-medium">District</th>
+              <th className="px-5 py-3 font-medium">Status</th>
+              <th className="px-5 py-3 font-medium">Duty</th>
+              <th className="px-5 py-3 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td className="px-4 py-6 text-center text-slate-400" colSpan={6}>
+                <td className="px-5 py-10 text-center text-sm text-slate-400" colSpan={6}>
                   Loading…
                 </td>
               </tr>
             )}
             {employees.map((emp) => (
-              <tr key={emp.id} className="border-b border-slate-100">
-                <td className="px-4 py-2 font-medium text-slate-800">{emp.name}</td>
-                <td className="px-4 py-2">{emp.phone}</td>
-                <td className="px-4 py-2">{emp.district?.name ?? "—"}</td>
-                <td className="px-4 py-2">
+              <tr key={emp.id} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70">
+                <td className="px-5 py-3 font-medium text-slate-800">{emp.name}</td>
+                <td className="px-5 py-3">{emp.phone}</td>
+                <td className="px-5 py-3">{emp.district?.name ?? "—"}</td>
+                <td className="px-5 py-3">
                   <Badge tone={emp.active ? "green" : "red"}>{emp.active ? "active" : "disabled"}</Badge>
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-5 py-3">
                   <Badge tone={emp.employeeLocation?.onDuty ? "blue" : "slate"}>
                     {emp.employeeLocation?.onDuty ? "on duty" : "off duty"}
                   </Badge>
                 </td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-5 py-3 text-right">
                   <Button variant="ghost" onClick={() => toggleActive(emp)}>
                     {emp.active ? "Disable" : "Enable"}
                   </Button>

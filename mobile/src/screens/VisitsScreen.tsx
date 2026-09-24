@@ -1,19 +1,12 @@
-import React, { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../lib/api";
 import { getCurrentPosition } from "../lib/locationTask";
 import type { Visit } from "../lib/types";
+import { Button, Card, EmptyState, Field, Loading, SectionLabel } from "../components/ui";
+import { colors, formatDateTime, formatDuration, formatTime, radius } from "../theme";
 
 export default function VisitsScreen() {
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -22,6 +15,7 @@ export default function VisitsScreen() {
   const [shopName, setShopName] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [, setTick] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -41,6 +35,13 @@ export default function VisitsScreen() {
 
   const openVisit = visits.find((v) => !v.checkOutAt);
 
+  // Re-render every 30 s so the "time at shop" counter stays current.
+  useEffect(() => {
+    if (!openVisit) return;
+    const id = setInterval(() => setTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, [openVisit]);
+
   async function handleCheckIn() {
     if (!shopName.trim()) {
       Alert.alert("Missing info", "Shop name is required.");
@@ -50,7 +51,7 @@ export default function VisitsScreen() {
     try {
       const pos = await getCurrentPosition();
       if (!pos) {
-        Alert.alert("Location unavailable", "Enable location to check in.");
+        Alert.alert("Location unavailable", "Turn on location to check in.");
         return;
       }
       await api("/api/visits/checkin", {
@@ -73,7 +74,7 @@ export default function VisitsScreen() {
     try {
       const pos = await getCurrentPosition();
       if (!pos) {
-        Alert.alert("Location unavailable", "Enable location to check out.");
+        Alert.alert("Location unavailable", "Turn on location to check out.");
         return;
       }
       await api(`/api/visits/${openVisit.id}/checkout`, { method: "POST", body: JSON.stringify(pos) });
@@ -85,19 +86,17 @@ export default function VisitsScreen() {
     }
   }
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-      </View>
-    );
-  }
+  if (loading) return <Loading />;
+
+  const history = visits.filter((v) => v.checkOutAt);
 
   return (
     <FlatList
-      data={visits}
+      style={{ backgroundColor: colors.background }}
+      data={history}
       keyExtractor={(item) => item.id}
-      contentContainerStyle={{ padding: 16, gap: 10 }}
+      contentContainerStyle={styles.list}
+      keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -108,85 +107,79 @@ export default function VisitsScreen() {
         />
       }
       ListHeaderComponent={
-        <View style={styles.formCard}>
+        <View style={{ gap: 16, marginBottom: 4 }}>
           {openVisit ? (
-            <>
-              <Text style={styles.formTitle}>Currently at {openVisit.shopName}</Text>
-              <Text style={styles.formHint}>
-                Checked in {new Date(openVisit.checkInAt).toLocaleTimeString()}
-              </Text>
-              <TouchableOpacity
-                style={[styles.button, styles.checkoutButton]}
-                onPress={handleCheckOut}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Check out</Text>
-                )}
-              </TouchableOpacity>
-            </>
+            <Card style={styles.active}>
+              <View style={styles.activeHeader}>
+                <View style={styles.liveDot} />
+                <Text style={styles.activeLabel}>At a shop now</Text>
+              </View>
+              <Text style={styles.activeShop}>{openVisit.shopName}</Text>
+              <View style={styles.metaRow}>
+                <Ionicons name="time-outline" size={16} color={colors.textMuted} />
+                <Text style={styles.meta}>
+                  In since {formatTime(openVisit.checkInAt)} · {formatDuration(openVisit.checkInAt)}
+                </Text>
+              </View>
+              {openVisit.notes ? <Text style={styles.notes}>{openVisit.notes}</Text> : null}
+              <Button label="Check out" icon="exit-outline" variant="danger" onPress={handleCheckOut} loading={submitting} />
+            </Card>
           ) : (
-            <>
+            <Card style={{ gap: 14 }}>
               <Text style={styles.formTitle}>Check in to a shop</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Shop name *"
-                value={shopName}
-                onChangeText={setShopName}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Notes"
-                value={notes}
-                onChangeText={setNotes}
-              />
-              <TouchableOpacity style={styles.button} onPress={handleCheckIn} disabled={submitting}>
-                {submitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Check in</Text>
-                )}
-              </TouchableOpacity>
-            </>
+              <Field icon="storefront-outline" placeholder="Shop name *" value={shopName} onChangeText={setShopName} />
+              <Field icon="create-outline" placeholder="Notes (optional)" value={notes} onChangeText={setNotes} />
+              <Button label="Check in here" icon="location" onPress={handleCheckIn} loading={submitting} />
+              <Text style={styles.hint}>Your current GPS location is saved with the visit.</Text>
+            </Card>
           )}
-          <Text style={[styles.sectionLabel, { marginTop: 20 }]}>Recent visits</Text>
+          {history.length > 0 ? <SectionLabel>Recent visits</SectionLabel> : null}
         </View>
       }
-      ListEmptyComponent={<Text style={styles.empty}>No visits yet.</Text>}
+      ListEmptyComponent={
+        openVisit ? null : (
+          <EmptyState icon="storefront-outline" title="No visits yet" hint="Check in when you reach a shop." />
+        )
+      }
       renderItem={({ item }) => (
-        <View style={styles.card}>
-          <Text style={styles.shop}>{item.shopName}</Text>
-          <Text style={styles.time}>
-            {new Date(item.checkInAt).toLocaleString()}
-            {item.checkOutAt ? ` → ${new Date(item.checkOutAt).toLocaleTimeString()}` : " (open)"}
-          </Text>
-        </View>
+        <Card style={styles.visit}>
+          <View style={styles.visitIcon}>
+            <Ionicons name="storefront" size={18} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.shop} numberOfLines={1}>
+              {item.shopName}
+            </Text>
+            <Text style={styles.meta}>
+              {formatDateTime(item.checkInAt)} · {formatDuration(item.checkInAt, item.checkOutAt)}
+            </Text>
+          </View>
+        </Card>
       )}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  empty: { textAlign: "center", color: "#9ca3af", marginTop: 20 },
-  formCard: { gap: 10, marginBottom: 8 },
-  formTitle: { fontSize: 16, fontWeight: "700" },
-  formHint: { fontSize: 13, color: "#6b7280" },
-  sectionLabel: { fontSize: 13, fontWeight: "700", color: "#6b7280" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
+  list: { padding: 16, gap: 10, paddingBottom: 32 },
+  formTitle: { fontSize: 18, fontWeight: "800", color: colors.text },
+  hint: { fontSize: 12, color: colors.textFaint, textAlign: "center" },
+  active: { gap: 10, borderColor: colors.success, borderWidth: 2, backgroundColor: colors.successSoft },
+  activeHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success },
+  activeLabel: { fontSize: 12, fontWeight: "800", color: colors.success, textTransform: "uppercase", letterSpacing: 0.6 },
+  activeShop: { fontSize: 22, fontWeight: "800", color: colors.text },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  meta: { fontSize: 13, color: colors.textMuted },
+  notes: { fontSize: 14, color: colors.text, fontStyle: "italic" },
+  visit: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
+  visitIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  button: { backgroundColor: "#1d4ed8", borderRadius: 8, paddingVertical: 12, alignItems: "center" },
-  checkoutButton: { backgroundColor: "#dc2626" },
-  buttonText: { color: "#fff", fontWeight: "700" },
-  card: { borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 10, padding: 12, gap: 4 },
-  shop: { fontSize: 15, fontWeight: "600" },
-  time: { fontSize: 12, color: "#6b7280" },
+  shop: { fontSize: 15, fontWeight: "700", color: colors.text },
 });
