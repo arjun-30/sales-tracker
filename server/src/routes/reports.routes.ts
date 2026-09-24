@@ -72,7 +72,8 @@ reportsRouter.get("/summary", async (req, res) => {
         ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
         : Prisma.empty;
       return prisma.$queryRaw<{ day: string; total: number; count: bigint }[]>`
-        SELECT to_char("createdAt", 'YYYY-MM-DD') as day, SUM("totalAmount")::float as total, COUNT(*) as count
+        -- createdAt is a UTC timestamp without zone: tag it as UTC, then convert to IST before bucketing by day.
+        SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') as day, SUM("totalAmount")::float as total, COUNT(*) as count
         FROM "Order"
         ${where}
         GROUP BY day ORDER BY day ASC
