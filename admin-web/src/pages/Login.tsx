@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { AlertCircle, MapPinned, Receipt, TrendingUp } from "lucide-react";
+import { AlertCircle, CheckCircle2, MapPinned, Receipt, TrendingUp } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/Button";
 import { Input, Label } from "../components/ui/Input";
@@ -11,6 +11,18 @@ const highlights = [
   { icon: TrendingUp, title: "Sales insight", text: "Track sales, visits and district coverage day by day." },
 ];
 
+const PHONE_LENGTH = 10;
+
+// Keeps a mobile number to 10 digits. A pasted "+91 98765 43210" or "098765 43210"
+// loses its country/trunk prefix; any other extra digit typed past 10 is ignored.
+function toMobileDigits(text: string) {
+  let digits = text.replace(/\D/g, "");
+  if ((digits.length === 12 && digits.startsWith("91")) || (digits.length === 11 && digits.startsWith("0"))) {
+    digits = digits.slice(-PHONE_LENGTH);
+  }
+  return digits.slice(0, PHONE_LENGTH);
+}
+
 export function Login() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -18,6 +30,8 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const phoneComplete = phone.length === PHONE_LENGTH;
 
   if (user) {
     return <Navigate to="/" replace />;
@@ -71,20 +85,36 @@ export function Login() {
         <div className="w-full max-w-sm">
           <img src="/roalux-logo.png" alt="Roalux" className="mb-10 h-12 w-auto lg:hidden" />
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Sign in</h2>
-          <p className="mt-1 text-sm text-slate-500">Use your admin phone number and password.</p>
+          <p className="mt-1 text-sm text-slate-500">Use your admin mobile number and password.</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
-              <Label>Phone number</Label>
-              <Input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="10-digit mobile number"
-                inputMode="tel"
-                autoComplete="username"
-                autoFocus
-                required
-              />
+              <div className="mb-1 flex items-baseline justify-between">
+                <Label>Mobile number</Label>
+                <span
+                  className={`text-xs font-semibold tabular-nums ${phoneComplete ? "text-emerald-600" : "text-slate-400"}`}
+                >
+                  {phone.length}/{PHONE_LENGTH}
+                </span>
+              </div>
+              <div className="flex overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20">
+                <span className="flex items-center border-r border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+                  +91
+                </span>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(toMobileDigits(e.target.value))}
+                  placeholder="98765 43210"
+                  inputMode="numeric"
+                  pattern="\d{10}"
+                  title="Exactly 10 digits"
+                  autoComplete="username"
+                  autoFocus
+                  required
+                  className="w-full px-3 py-2 text-sm tracking-wider outline-none placeholder:text-slate-400"
+                />
+                {phoneComplete ? <CheckCircle2 className="mr-3 h-4 w-4 shrink-0 self-center text-emerald-600" /> : null}
+              </div>
             </div>
             <div>
               <Label>Password</Label>
@@ -102,7 +132,7 @@ export function Login() {
                 {error}
               </div>
             )}
-            <Button type="submit" className="w-full py-2.5" disabled={submitting}>
+            <Button type="submit" className="w-full py-2.5" disabled={submitting || !phoneComplete || !password}>
               {submitting ? "Signing in…" : "Sign in"}
             </Button>
           </form>

@@ -19,6 +19,16 @@ import { colors, radius } from "../theme";
 
 const PHONE_LENGTH = 10;
 
+// Keeps a mobile number to 10 digits. A pasted "+91 98765 43210" or "098765 43210"
+// loses its country/trunk prefix; any other extra digit typed past 10 is ignored.
+function toMobileDigits(text: string) {
+  let digits = text.replace(/\D/g, "");
+  if ((digits.length === 12 && digits.startsWith("91")) || (digits.length === 11 && digits.startsWith("0"))) {
+    digits = digits.slice(-PHONE_LENGTH);
+  }
+  return digits.slice(0, PHONE_LENGTH);
+}
+
 export default function LoginScreen() {
   const { login } = useAuth();
   const passwordRef = useRef<TextInput>(null);
@@ -33,9 +43,7 @@ export default function LoginScreen() {
   const canSubmit = phoneComplete && password.length > 0 && !submitting;
 
   function handlePhoneChange(text: string) {
-    // Digits only, capped at 10: pasted "+91 98765 43210" keeps its last 10 digits.
-    const digits = text.replace(/\D/g, "");
-    setPhone(digits.length > PHONE_LENGTH ? digits.slice(-PHONE_LENGTH) : digits);
+    setPhone(toMobileDigits(text));
     if (error) setError(null);
   }
 
@@ -85,7 +93,6 @@ export default function LoginScreen() {
                   placeholder="98765 43210"
                   placeholderTextColor={colors.textFaint}
                   keyboardType="number-pad"
-                  maxLength={PHONE_LENGTH}
                   autoComplete="tel"
                   textContentType="telephoneNumber"
                   returnKeyType="next"
