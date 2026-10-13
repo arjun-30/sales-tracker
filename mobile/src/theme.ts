@@ -1,8 +1,10 @@
 // Shared look for every screen: change a value here, not in a screen's StyleSheet.
 export const colors = {
-  primary: "#1d4ed8",
-  primaryDark: "#1e3a8a",
-  primarySoft: "#eff6ff",
+  primary: "#0277bd",
+  primaryDark: "#065f98",
+  primarySoft: "#eef7fd",
+  ink: "#0b111e",
+  inkSoft: "#1b2335",
   success: "#15803d",
   successSoft: "#ecfdf5",
   warning: "#b45309",
@@ -15,8 +17,11 @@ export const colors = {
   border: "#e2e8f0",
   borderStrong: "#cbd5e1",
   surface: "#ffffff",
-  background: "#f1f5f9",
+  background: "#f4f6f9",
 };
+
+// The six swatches from the Roalux logo. Accents only, never body text.
+export const paint = ["#e5007d", "#4db848", "#f5921e", "#e31e2d", "#00a6e6", "#ffe500"] as const;
 
 export const radius = { sm: 8, md: 12, lg: 16, pill: 999 };
 

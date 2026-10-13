@@ -23,7 +23,7 @@ export function CardHeader({ title, description, actions }: { title: string; des
 type Tone = "blue" | "green" | "amber" | "violet" | "slate";
 
 const statTones: Record<Tone, string> = {
-  blue: "bg-teal-50 text-teal-600",
+  blue: "bg-brand-50 text-brand-600",
   green: "bg-emerald-50 text-emerald-600",
   amber: "bg-amber-50 text-amber-600",
   violet: "bg-violet-50 text-violet-600",
@@ -73,14 +73,14 @@ export function Badge({
     green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
     yellow: "bg-amber-50 text-amber-700 ring-amber-200",
     red: "bg-red-50 text-red-700 ring-red-200",
-    blue: "bg-teal-50 text-teal-700 ring-teal-200",
+    blue: "bg-brand-50 text-brand-700 ring-brand-200",
   };
   const dots: Record<string, string> = {
     slate: "bg-slate-400",
     green: "bg-emerald-500",
     yellow: "bg-amber-500",
     red: "bg-red-500",
-    blue: "bg-teal-500",
+    blue: "bg-brand-500",
   };
   return (
     <span

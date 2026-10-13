@@ -64,7 +64,7 @@ export async function startBackgroundLocationUpdates(): Promise<void> {
     distanceInterval: 30,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
-      notificationTitle: "PaintTracker — on duty",
+      notificationTitle: "Roalux Sales — on duty",
       notificationBody: "Sharing your live location with the admin team.",
     },
   });

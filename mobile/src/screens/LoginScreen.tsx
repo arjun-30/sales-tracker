@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -11,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useAuth } from "../context/AuthContext";
-import { Button, Field } from "../components/ui";
+import { Button, Field, PaintStripe } from "../components/ui";
 import { colors, radius } from "../theme";
 
 export default function LoginScreen() {
@@ -35,66 +36,67 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View style={styles.brand}>
-            <View style={styles.logo}>
-              <Ionicons name="color-palette" size={36} color="#fff" />
-            </View>
-            <Text style={styles.title}>PaintTracker</Text>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+          <View style={styles.hero}>
+            <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
+            <Text style={styles.title}>Sales</Text>
             <Text style={styles.subtitle}>Sign in to start your day</Text>
           </View>
+          <PaintStripe height={5} />
 
-          <View style={styles.form}>
-            <Field
-              label="Phone number"
-              icon="call-outline"
-              placeholder="10-digit mobile number"
-              keyboardType="phone-pad"
-              autoCapitalize="none"
-              value={phone}
-              onChangeText={setPhone}
-              maxLength={15}
-            />
-            <View>
+          <View style={styles.container}>
+            <View style={styles.form}>
               <Field
-                label="Password"
-                icon="lock-closed-outline"
-                placeholder="Your password"
-                secureTextEntry={!showPassword}
+                label="Phone number"
+                icon="call-outline"
+                placeholder="10-digit mobile number"
+                keyboardType="phone-pad"
                 autoCapitalize="none"
-                value={password}
-                onChangeText={setPassword}
-                onSubmitEditing={handleSubmit}
-                style={{ paddingRight: 32 }}
+                value={phone}
+                onChangeText={setPhone}
+                maxLength={15}
               />
-              <TouchableOpacity
-                style={styles.eye}
-                onPress={() => setShowPassword((s) => !s)}
-                accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-              >
-                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textMuted} />
-              </TouchableOpacity>
+              <View>
+                <Field
+                  label="Password"
+                  icon="lock-closed-outline"
+                  placeholder="Your password"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  value={password}
+                  onChangeText={setPassword}
+                  onSubmitEditing={handleSubmit}
+                  style={{ paddingRight: 32 }}
+                />
+                <TouchableOpacity
+                  style={styles.eye}
+                  onPress={() => setShowPassword((s) => !s)}
+                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                >
+                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              {error ? (
+                <View style={styles.error}>
+                  <Ionicons name="alert-circle" size={18} color={colors.danger} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
+              <Button
+                label="Log in"
+                icon="log-in-outline"
+                onPress={handleSubmit}
+                loading={submitting}
+                disabled={!phone || !password}
+              />
             </View>
 
-            {error ? (
-              <View style={styles.error}>
-                <Ionicons name="alert-circle" size={18} color={colors.danger} />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : null}
-
-            <Button
-              label="Log in"
-              icon="log-in-outline"
-              onPress={handleSubmit}
-              loading={submitting}
-              disabled={!phone || !password}
-            />
+            <Text style={styles.footer}>Trouble signing in? Contact your manager.</Text>
           </View>
-
-          <Text style={styles.footer}>Trouble signing in? Contact your manager.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -102,20 +104,19 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  container: { flexGrow: 1, justifyContent: "center", padding: 24, gap: 28 },
-  brand: { alignItems: "center", gap: 6 },
-  logo: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
+  safe: { flex: 1, backgroundColor: colors.ink },
+  hero: { backgroundColor: colors.ink, alignItems: "center", paddingTop: 48, paddingBottom: 36, paddingHorizontal: 24 },
+  logo: { width: 220, height: 77 },
+  title: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#94a3b8",
+    letterSpacing: 4,
+    textTransform: "uppercase",
+    marginTop: 14,
   },
-  title: { fontSize: 28, fontWeight: "800", color: colors.text },
-  subtitle: { fontSize: 15, color: colors.textMuted },
+  subtitle: { fontSize: 16, color: "#e2e8f0", marginTop: 6, fontWeight: "500" },
+  container: { flexGrow: 1, backgroundColor: colors.background, padding: 24, gap: 24 },
   form: {
     gap: 16,
     backgroundColor: colors.surface,

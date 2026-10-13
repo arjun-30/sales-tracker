@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -18,8 +19,8 @@ import { useDuty } from "../context/DutyContext";
 import { api } from "../lib/api";
 import type { Order, Visit } from "../lib/types";
 import type { RootStackParamList, TabParamList } from "../navigation/types";
-import { Card, SectionLabel } from "../components/ui";
-import { colors, formatINR, radius } from "../theme";
+import { Card, PaintStripe, SectionLabel } from "../components/ui";
+import { colors, formatINR, paint, radius } from "../theme";
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList, "Home">,
@@ -91,7 +92,14 @@ export default function HomeScreen() {
         }
       >
         <View style={styles.header}>
-          <View style={{ flex: 1 }}>
+          <PaintStripe />
+          <View style={styles.headerBody}>
+            <View style={styles.headerTop}>
+              <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
+              <TouchableOpacity style={styles.logout} onPress={logout} accessibilityLabel="Log out">
+                <Ionicons name="log-out-outline" size={22} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
             <Text style={styles.date}>{today}</Text>
             <Text style={styles.greeting}>
               {greeting()}, {user?.name?.split(" ")[0]}
@@ -101,9 +109,6 @@ export default function HomeScreen() {
               <Text style={styles.district}>{user?.district?.name ?? "No district assigned"}</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.logout} onPress={logout} accessibilityLabel="Log out">
-            <Ionicons name="log-out-outline" size={22} color={colors.textMuted} />
-          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -114,16 +119,16 @@ export default function HomeScreen() {
         >
           <View style={[styles.dutyIcon, onDuty ? styles.dutyIconOn : styles.dutyIconOff]}>
             {busy ? (
-              <ActivityIndicator color={onDuty ? colors.success : "#fff"} />
+              <ActivityIndicator color={onDuty ? colors.success : colors.ink} />
             ) : (
-              <Ionicons name={onDuty ? "radio" : "power"} size={30} color={onDuty ? colors.success : "#fff"} />
+              <Ionicons name={onDuty ? "radio" : "power"} size={30} color={onDuty ? colors.success : colors.ink} />
             )}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.dutyTitle, onDuty && { color: colors.success }]}>
+            <Text style={[styles.dutyTitle, onDuty ? { color: colors.success } : { color: "#fff" }]}>
               {onDuty ? "On duty" : "Off duty"}
             </Text>
-            <Text style={styles.dutyHint}>
+            <Text style={[styles.dutyHint, !onDuty && { color: "#cbd5e1" }]}>
               {onDuty ? "Sharing your live location. Tap to go off duty." : "Tap to start your day and share location."}
             </Text>
           </View>
@@ -131,26 +136,36 @@ export default function HomeScreen() {
 
         <SectionLabel>Today</SectionLabel>
         <View style={styles.stats}>
-          <Stat icon="receipt-outline" label="Orders" value={stats ? String(stats.orders) : "–"} />
-          <Stat icon="cash-outline" label="Sales" value={stats ? formatINR(stats.sales) : "–"} />
-          <Stat icon="storefront-outline" label="Visits" value={stats ? String(stats.visits) : "–"} />
+          <Stat icon="receipt-outline" tint={paint[0]} label="Orders" value={stats ? String(stats.orders) : "–"} />
+          <Stat icon="cash-outline" tint={paint[1]} label="Sales" value={stats ? formatINR(stats.sales) : "–"} />
+          <Stat icon="storefront-outline" tint={paint[2]} label="Visits" value={stats ? String(stats.visits) : "–"} />
         </View>
 
         <SectionLabel>Quick actions</SectionLabel>
         <View style={styles.actions}>
-          <Action icon="add-circle" label="New order" tint={colors.primary} onPress={() => navigation.navigate("NewOrder")} />
-          <Action icon="storefront" label="Shop visit" tint={colors.success} onPress={() => navigation.navigate("Visits")} />
-          <Action icon="pricetags" label="Price list" tint={colors.warning} onPress={() => navigation.navigate("Catalog")} />
+          <Action icon="add" label="New order" tint={paint[4]} onPress={() => navigation.navigate("NewOrder")} />
+          <Action icon="storefront" label="Shop visit" tint={paint[1]} onPress={() => navigation.navigate("Visits")} />
+          <Action icon="pricetags" label="Price list" tint={paint[2]} onPress={() => navigation.navigate("Catalog")} />
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Stat({ icon, label, value }: { icon: React.ComponentProps<typeof Ionicons>["name"]; label: string; value: string }) {
+function Stat({
+  icon,
+  tint,
+  label,
+  value,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  tint: string;
+  label: string;
+  value: string;
+}) {
   return (
-    <Card style={styles.stat}>
-      <Ionicons name={icon} size={18} color={colors.textMuted} />
+    <Card style={[styles.stat, { borderTopColor: tint }]}>
+      <Ionicons name={icon} size={18} color={tint} />
       <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
@@ -172,7 +187,9 @@ function Action({
 }) {
   return (
     <TouchableOpacity activeOpacity={0.8} style={styles.action} onPress={onPress}>
-      <Ionicons name={icon} size={28} color={tint} />
+      <View style={[styles.actionIcon, { backgroundColor: tint }]}>
+        <Ionicons name={icon} size={24} color="#fff" />
+      </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
   );
@@ -181,7 +198,16 @@ function Action({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { padding: 20, gap: 16, paddingBottom: 32 },
-  header: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 4 },
+  header: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
+  headerBody: { padding: 18, paddingTop: 14 },
+  headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+  logo: { width: 120, height: 42 },
   date: { fontSize: 13, color: colors.textMuted, fontWeight: "500" },
   greeting: { fontSize: 24, fontWeight: "800", color: colors.text, marginTop: 2 },
   districtRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
@@ -190,9 +216,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -205,14 +229,14 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   dutyOn: { backgroundColor: colors.successSoft, borderColor: colors.success },
-  dutyOff: { backgroundColor: colors.surface, borderColor: colors.border },
+  dutyOff: { backgroundColor: colors.ink, borderColor: colors.ink },
   dutyIcon: { width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center" },
   dutyIconOn: { backgroundColor: "#d1fae5" },
-  dutyIconOff: { backgroundColor: colors.primary },
+  dutyIconOff: { backgroundColor: "#fff" },
   dutyTitle: { fontSize: 22, fontWeight: "800", color: colors.text },
   dutyHint: { fontSize: 14, color: colors.textMuted, marginTop: 2 },
   stats: { flexDirection: "row", gap: 10 },
-  stat: { flex: 1, padding: 14, gap: 4 },
+  stat: { flex: 1, padding: 14, gap: 4, borderTopWidth: 3 },
   statValue: { fontSize: 20, fontWeight: "800", color: colors.text },
   statLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
   actions: { flexDirection: "row", gap: 10 },
@@ -226,5 +250,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
   actionLabel: { fontSize: 13, fontWeight: "700", color: colors.text },
 });

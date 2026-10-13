@@ -1,5 +1,6 @@
 import React from "react";
 import { ActivityIndicator, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -28,7 +29,8 @@ const TAB_ICONS: Record<keyof TabParamList, [React.ComponentProps<typeof Ionicon
 
 const headerStyle = {
   headerStyle: { backgroundColor: colors.surface },
-  headerTitleStyle: { fontWeight: "700" as const, color: colors.text },
+  headerTitleStyle: { fontWeight: "800" as const, color: colors.text, fontSize: 18 },
+  headerTintColor: colors.primary,
   headerShadowVisible: false,
 };
 
@@ -48,7 +50,7 @@ function Tabs() {
         headerTitleAlign: "center",
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textFaint,
-        tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: "700" },
         tabBarStyle: {
           height: 60 + insets.bottom,
           paddingTop: 6,
@@ -81,6 +83,8 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer theme={navTheme}>
+      {/* The only StatusBar in the app: light over the dark login hero, dark everywhere else. */}
+      <StatusBar style={user ? "dark" : "light"} />
       {user ? (
         <DutyProvider>
           <Stack.Navigator screenOptions={headerStyle}>

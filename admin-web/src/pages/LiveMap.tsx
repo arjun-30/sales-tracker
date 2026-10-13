@@ -72,7 +72,7 @@ const STALE_AFTER_MS = 10 * 60 * 1000;
 // as offline instead.
 const OFFLINE_AFTER_MS = 2 * 60 * 60 * 1000;
 
-const COLOR_ACTIVE = "#0d9488";
+const COLOR_ACTIVE = "#0277bd";
 const COLOR_STALE = "#94a3b8";
 
 type Status = "active" | "stale" | "offline";
@@ -501,7 +501,7 @@ export function LiveMap() {
             ))}
           </Select>
           <div className="grid grid-cols-3 gap-2 text-center">
-            <Stat label="Active" value={activeCount} tone="text-teal-600" />
+            <Stat label="Active" value={activeCount} tone="text-brand-600" />
             <Stat label="No signal" value={staleCount} tone="text-slate-500" />
             <Stat label="Offline" value={offline.length} tone="text-slate-400" />
           </div>
@@ -524,7 +524,7 @@ export function LiveMap() {
                     <button
                       onClick={() => focusEmployee(e)}
                       className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition ${
-                        isSelected ? "bg-teal-50" : "hover:bg-slate-50"
+                        isSelected ? "bg-brand-50" : "hover:bg-slate-50"
                       }`}
                     >
                       <span

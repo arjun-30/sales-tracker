@@ -44,7 +44,7 @@ export function DutyProvider({ children }: { children: React.ReactNode }) {
         if (!perms.granted) {
           Alert.alert(
             "Location permission needed",
-            "PaintTracker needs location access to go on duty."
+            "Roalux Sales needs location access to go on duty."
           );
           return;
         }

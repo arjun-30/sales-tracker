@@ -1,9 +1,49 @@
 @import "tailwindcss";
 
+/* Roalux brand. `brand` is the interactive colour (buttons, links, active
+   states); `paint-*` are the six swatches from the logo, used for accents and
+   charts only; `ink` is the dark chrome behind the sidebar and login panel. */
+@theme {
+  --color-brand-50: #eef7fd;
+  --color-brand-100: #d6ecfa;
+  --color-brand-200: #add8f3;
+  --color-brand-300: #74bde9;
+  --color-brand-400: #3a9fdb;
+  --color-brand-500: #0e88cf;
+  --color-brand-600: #0277bd;
+  --color-brand-700: #065f98;
+  --color-brand-800: #0b4f7d;
+  --color-brand-900: #0f4268;
+
+  --color-paint-magenta: #e5007d;
+  --color-paint-green: #4db848;
+  --color-paint-orange: #f5921e;
+  --color-paint-red: #e31e2d;
+  --color-paint-blue: #00a6e6;
+  --color-paint-yellow: #ffe500;
+
+  --color-ink-800: #1b2335;
+  --color-ink-900: #121a2b;
+  --color-ink-950: #0b111e;
+}
+
 :root {
   color-scheme: light;
 }
 
 body {
-  @apply bg-[#f6f8f7] text-slate-900 antialiased;
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* The six logo swatches as one thin band. */
+.paint-stripe {
+  background: linear-gradient(
+    90deg,
+    var(--color-paint-magenta) 0 16.66%,
+    var(--color-paint-green) 0 33.33%,
+    var(--color-paint-orange) 0 50%,
+    var(--color-paint-red) 0 66.66%,
+    var(--color-paint-blue) 0 83.33%,
+    var(--color-paint-yellow) 0 100%
+  );
 }

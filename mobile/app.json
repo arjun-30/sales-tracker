@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "PaintTracker Sales",
+    "name": "Roalux Sales",
     "slug": "paint-tracker-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,7 +18,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -46,7 +46,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "PaintTracker needs your location in the background so the admin team can see your position on the map while you're on duty.",
+          "locationAlwaysAndWhenInUsePermission": "Roalux Sales needs your location in the background so the admin team can see your position on the map while you're on duty.",
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }

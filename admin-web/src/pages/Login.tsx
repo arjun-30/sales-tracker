@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { AlertCircle, MapPinned, PaintBucket, Receipt, TrendingUp } from "lucide-react";
+import { AlertCircle, MapPinned, Receipt, TrendingUp } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/Button";
 import { Input, Label } from "../components/ui/Input";
@@ -38,45 +38,38 @@ export function Login() {
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-gradient-to-br from-teal-700 via-teal-800 to-emerald-900 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-teal-300/20 blur-3xl" />
-        <div className="absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-emerald-400/20 blur-3xl" />
-        <div className="relative flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25">
-            <PaintBucket className="h-5 w-5" />
-          </div>
-          <span className="text-lg font-semibold">PaintTracker</span>
+    <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+      <div className="relative hidden overflow-hidden bg-ink-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="paint-stripe absolute inset-x-0 top-0 h-1.5" />
+        <div className="absolute -right-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-paint-magenta/15 blur-3xl" />
+        <div className="absolute -bottom-40 -left-24 h-[28rem] w-[28rem] rounded-full bg-paint-blue/15 blur-3xl" />
+        <div className="relative">
+          <img src="/roalux-logo.png" alt="Roalux" className="h-16 w-auto" />
         </div>
         <div className="relative space-y-8">
-          <h1 className="max-w-md text-3xl font-semibold leading-tight tracking-tight">
+          <h1 className="max-w-md text-4xl font-semibold leading-tight tracking-tight">
             Your field sales team, on one screen.
           </h1>
           <ul className="space-y-5">
             {highlights.map(({ icon: Icon, title, text }) => (
               <li key={title} className="flex gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                  <Icon className="h-5 w-5 text-teal-100" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/10">
+                  <Icon className="h-5 w-5 text-brand-300" />
                 </div>
                 <div>
                   <div className="font-medium">{title}</div>
-                  <div className="text-sm text-teal-100/80">{text}</div>
+                  <div className="text-sm text-slate-400">{text}</div>
                 </div>
               </li>
             ))}
           </ul>
         </div>
-        <div className="relative text-xs text-teal-100/60">Admin access only</div>
+        <div className="relative text-xs text-slate-500">Admin access only</div>
       </div>
 
       <div className="flex items-center justify-center bg-slate-50 px-4 py-12">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-600 text-white">
-              <PaintBucket className="h-5 w-5" />
-            </div>
-            <span className="text-lg font-semibold text-slate-900">PaintTracker</span>
-          </div>
+          <img src="/roalux-logo.png" alt="Roalux" className="mb-10 h-12 w-auto lg:hidden" />
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Sign in</h2>
           <p className="mt-1 text-sm text-slate-500">Use your admin phone number and password.</p>
 
