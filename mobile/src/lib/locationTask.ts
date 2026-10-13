@@ -1,6 +1,6 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
-import { api, SessionExpiredError } from "./api";
+import { api, ApiError, SessionExpiredError } from "./api";
 
 export const LOCATION_TASK_NAME = "paint-tracker-background-location";
 
@@ -23,6 +23,13 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
       }),
     });
   } catch (err) {
+    // 409 means the server no longer has us on duty (it switches off anyone
+    // who went silent for hours, e.g. a long dead zone). Stop tracking so the
+    // phone agrees with the server; the app shows "off duty" when reopened.
+    if (err instanceof ApiError && err.status === 409) {
+      await stopBackgroundLocationUpdates().catch(() => {});
+      return;
+    }
     // Offline or session expired mid-shift: the next successful tick will
     // catch the device up, so we swallow rather than crash the background task.
     if (!(err instanceof SessionExpiredError)) {

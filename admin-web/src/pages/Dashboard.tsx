@@ -20,7 +20,7 @@ import type { District, ReportSummary } from "../lib/types";
 import { Badge, Card, CardHeader, PageHeader, StatCard } from "../components/ui/Card";
 import { Select } from "../components/ui/Input";
 
-const PALETTE = ["#2563eb", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#db2777", "#4b5563"];
+const PALETTE = ["#0d9488", "#16a34a", "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#db2777", "#4b5563"];
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
@@ -31,7 +31,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "#d97706",
-  confirmed: "#2563eb",
+  confirmed: "#0d9488",
   delivered: "#16a34a",
   cancelled: "#dc2626",
 };
@@ -85,7 +85,7 @@ export function Dashboard() {
             key={p.id}
             onClick={() => setPeriod(p.id)}
             className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              period === p.id ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+              period === p.id ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
             {p.label}
@@ -185,7 +185,7 @@ export function Dashboard() {
               <XAxis dataKey="districtName" tick={{ fontSize: 11 }} interval={0} angle={-30} textAnchor="end" height={70} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Bar dataKey="totalSales" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="totalSales" fill="#0d9488" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
           </div>
@@ -200,7 +200,7 @@ export function Dashboard() {
               <XAxis dataKey="day" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Line type="monotone" dataKey="total" stroke="#2563eb" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="total" stroke="#0d9488" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
           </div>
@@ -221,7 +221,7 @@ export function Dashboard() {
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={160} />
                 <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Bar dataKey="revenue" fill="#2563eb" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="revenue" fill="#0d9488" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

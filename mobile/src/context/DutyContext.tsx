@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, AppState } from "react-native";
 import { api } from "../lib/api";
 import {
   getCurrentPosition,
@@ -21,11 +21,19 @@ export function DutyProvider({ children }: { children: React.ReactNode }) {
   const [onDuty, setOnDuty] = useState(false);
   const [busy, setBusy] = useState(true);
 
+  // Re-read on every return to the foreground: tracking can be stopped behind
+  // the app's back (the server switched us off duty after a long silence).
   useEffect(() => {
-    isBackgroundLocationRunning().then((running) => {
-      setOnDuty(running);
-      setBusy(false);
+    const sync = () =>
+      isBackgroundLocationRunning().then((running) => {
+        setOnDuty(running);
+        setBusy(false);
+      });
+    sync();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") sync();
     });
+    return () => sub.remove();
   }, []);
 
   const toggleDuty = useCallback(async () => {

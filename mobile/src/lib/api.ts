@@ -39,6 +39,12 @@ async function tryRefresh(): Promise<string | null> {
   return data.accessToken as string;
 }
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
 export class SessionExpiredError extends Error {
   constructor() {
     super("Session expired");
@@ -68,7 +74,7 @@ export async function api<T>(path: string, options: RequestInit = {}, retry = tr
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(typeof body.error === "string" ? body.error : JSON.stringify(body.error));
+    throw new ApiError(typeof body.error === "string" ? body.error : JSON.stringify(body.error), res.status);
   }
 
   if (res.status === 204) return undefined as T;

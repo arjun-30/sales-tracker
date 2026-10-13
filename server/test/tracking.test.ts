@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../src/db";
 import { api, bearer, ensureSocket, login, resetDb, seedFixtures, type Fixtures } from "./helpers";
+import { sweepStaleDuty } from "../src/lib/dutySweep";
 
 let f: Fixtures;
 let emp: string;
@@ -54,5 +55,32 @@ describe("duty and live tracking", () => {
   it("rejects out-of-range coordinates", async () => {
     await goOnDuty();
     expect((await sendLocation(123, 80)).status).toBe(400);
+  });
+});
+
+describe("stale duty sweep", () => {
+  const ageRow = (minutes: number) =>
+    prisma.$executeRaw`UPDATE "EmployeeLocation" SET "updatedAt" = now() - make_interval(mins => ${minutes}::int)`;
+
+  it("switches an employee silent past the timeout off duty without touching their last-seen time", async () => {
+    await goOnDuty();
+    await ageRow(180);
+    const before = await prisma.employeeLocation.findUniqueOrThrow({ where: { userId: f.empA.id } });
+
+    expect(await sweepStaleDuty(120)).toBe(1);
+
+    const after = await prisma.employeeLocation.findUniqueOrThrow({ where: { userId: f.empA.id } });
+    expect(after.onDuty).toBe(false);
+    expect(after.updatedAt.getTime()).toBe(before.updatedAt.getTime());
+    const live = await api().get("/api/tracking/live").set(bearer(admin));
+    expect(live.body.locations).toEqual([]);
+  });
+
+  it("leaves an employee who reported recently on duty", async () => {
+    await goOnDuty();
+    await ageRow(30);
+    expect(await sweepStaleDuty(120)).toBe(0);
+    const row = await prisma.employeeLocation.findUniqueOrThrow({ where: { userId: f.empA.id } });
+    expect(row.onDuty).toBe(true);
   });
 });

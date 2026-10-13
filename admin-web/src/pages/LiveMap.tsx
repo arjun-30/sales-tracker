@@ -1,39 +1,47 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DataF, GoogleMap, InfoWindowF, MarkerF, useJsApiLoader } from "@react-google-maps/api";
+import { DataF, GoogleMap, InfoWindowF, MarkerF, PolygonF, useJsApiLoader } from "@react-google-maps/api";
+import { Crosshair, MapPin, WifiOff } from "lucide-react";
 import { api } from "../lib/api";
 import { connectSocket } from "../lib/socket";
 import type { District, EmployeeLocation } from "../lib/types";
 import { Select } from "../components/ui/Input";
-import { Card, PageHeader } from "../components/ui/Card";
 
 const TAMIL_NADU_CENTER = { lat: 10.8284, lng: 78.7638 };
-const containerStyle = { width: "100%", height: "calc(100vh - 3rem)" };
+const containerStyle = { width: "100%", height: "100%" };
 
 // Bounding box of the TN districts geojson, padded slightly so state edges
 // aren't flush against the map edge.
 const TN_BOUNDS = { north: 13.75, south: 7.9, west: 76.05, east: 80.55 };
 
+// Panning is locked to a box around the state so the admin can't wander off.
+// It has to be wider than the state itself: with strictBounds Google zooms in
+// until the whole viewport fits inside it, which on a wide screen would crop
+// Tamil Nadu. The mask below hides everything in the margin anyway.
+const TN_RESTRICTION_BOUNDS = { north: 16.5, south: 5.5, west: 71, east: 86.5 };
+
+// Everything outside Tamil Nadu is painted over with this, so the state reads
+// as the only land on the map.
+const MASK_COLOR = "#e8edeb";
+
 const MAP_OPTIONS: google.maps.MapOptions = {
   disableDefaultUI: true,
   zoomControl: true,
-  fullscreenControl: true,
   clickableIcons: false,
+  keyboardShortcuts: false,
+  // Lets fitBounds land between whole zoom levels so the state fills the
+  // screen instead of snapping to a size that's either cropped or tiny.
+  isFractionalZoomEnabled: true,
+  backgroundColor: MASK_COLOR,
+  minZoom: 6,
+  maxZoom: 18,
+  restriction: { latLngBounds: TN_RESTRICTION_BOUNDS, strictBounds: true },
+  // Google's standard road styling stays (highways, main roads, streets and
+  // their names); only clutter that doesn't help a sales manager is hidden.
   styles: [
-    { elementType: "geometry", stylers: [{ color: "#f5f7fa" }] },
-    { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-    { elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
-    { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }] },
-    { featureType: "administrative", elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
-    { featureType: "administrative.country", elementType: "geometry.stroke", stylers: [{ color: "#cbd5e1" }] },
-    { featureType: "administrative.province", elementType: "geometry.stroke", stylers: [{ visibility: "off" }] },
-    { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] },
+    { featureType: "administrative.country", elementType: "labels", stylers: [{ visibility: "off" }] },
+    { featureType: "administrative.province", stylers: [{ visibility: "off" }] },
     { featureType: "poi", stylers: [{ visibility: "off" }] },
-    { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
-    { featureType: "road", elementType: "labels", stylers: [{ visibility: "off" }] },
-    { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
-    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#dbe4ee" }] },
-    { featureType: "transit", stylers: [{ visibility: "off" }] },
-    { featureType: "water", elementType: "geometry", stylers: [{ color: "#dbeafe" }] },
+    { featureType: "transit", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
   ],
 };
 
@@ -58,6 +66,22 @@ function normalizeDistrictName(name: string): string {
 // apart on the map.
 const STALE_AFTER_MS = 10 * 60 * 1000;
 
+// Past this the "on duty" flag is no longer believable: the app was most
+// likely killed or the phone died without ever sending "off duty". Such
+// employees are taken off the map and out of the on-duty count, and listed
+// as offline instead.
+const OFFLINE_AFTER_MS = 2 * 60 * 60 * 1000;
+
+const COLOR_ACTIVE = "#0d9488";
+const COLOR_STALE = "#94a3b8";
+
+type Status = "active" | "stale" | "offline";
+
+function statusOf(updatedAt: string, now: number): Status {
+  const age = now - new Date(updatedAt).getTime();
+  return age > OFFLINE_AFTER_MS ? "offline" : age > STALE_AFTER_MS ? "stale" : "active";
+}
+
 interface LiveEntry {
   employeeId: string;
   name: string;
@@ -66,6 +90,28 @@ interface LiveEntry {
   lng: number;
   onDuty: boolean;
   updatedAt: string;
+}
+
+// public/tn-mask.json: `outer` is a frame far beyond the pan restriction and
+// `tn` holds the state's outline rings (mainland + islands), wound opposite
+// to the frame so Google Maps cuts them out as holes.
+interface TnMask {
+  outer: google.maps.LatLngLiteral[];
+  tn: google.maps.LatLngLiteral[][];
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
+function timeAgo(iso: string, now: number): string {
+  const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
 export function LiveMap() {
@@ -80,6 +126,7 @@ export function LiveMap() {
   const [geoReady, setGeoReady] = useState(false);
   const [hoveredDistrict, setHoveredDistrict] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [mask, setMask] = useState<TnMask | null>(null);
 
   const mapRef = useRef<google.maps.Map | null>(null);
   const dataLayerRef = useRef<google.maps.Data | null>(null);
@@ -87,6 +134,13 @@ export function LiveMap() {
   useEffect(() => {
     districtsRef.current = districts;
   }, [districts]);
+
+  useEffect(() => {
+    fetch("/tn-mask.json")
+      .then((r) => r.json())
+      .then((data: TnMask) => setMask(data))
+      .catch((err) => console.error("[LiveMap] failed to load tn-mask.json", err));
+  }, []);
 
   // Re-check marker staleness periodically even when no new socket events
   // arrive, so a marker visibly fades once its last update ages past the
@@ -139,20 +193,40 @@ export function LiveMap() {
   }, []);
 
   const visibleEntries = useMemo(
-    () => Object.values(entries).filter((e) => !districtFilter || e.districtId === districtFilter),
-    [entries, districtFilter]
+    () =>
+      Object.values(entries)
+        .filter((e) => !districtFilter || e.districtId === districtFilter)
+        .map((e) => ({ ...e, status: statusOf(e.updatedAt, now) }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [entries, districtFilter, now]
   );
+
+  const onMap = useMemo(() => visibleEntries.filter((e) => e.status !== "offline"), [visibleEntries]);
+  const offline = useMemo(() => visibleEntries.filter((e) => e.status === "offline"), [visibleEntries]);
+  const activeCount = onMap.filter((e) => e.status === "active").length;
+  const staleCount = onMap.length - activeCount;
+
+  const districtNameById = useMemo(() => new Map(districts.map((d) => [d.id, d.name])), [districts]);
 
   const onSelectEmployee = useCallback((id: string) => {
     setSelectedEmployee((cur) => (cur === id ? null : id));
   }, []);
 
-  // The selected employee can vanish from `entries` (goes off duty) without
-  // ever passing back through onSelectEmployee, which would otherwise leave
-  // a dangling InfoWindow reference for an id that no longer renders a marker.
+  const focusEmployee = useCallback((e: LiveEntry) => {
+    setSelectedEmployee(e.employeeId);
+    const map = mapRef.current;
+    if (!map) return;
+    map.panTo({ lat: e.lat, lng: e.lng });
+    if ((map.getZoom() ?? 0) < 13) map.setZoom(13);
+  }, []);
+
+  // The selected employee can vanish from the map (goes off duty or offline)
+  // without ever passing back through onSelectEmployee, which would otherwise
+  // leave a dangling InfoWindow reference for an id that no longer renders a
+  // marker.
   useEffect(() => {
-    if (selectedEmployee && !entries[selectedEmployee]) setSelectedEmployee(null);
-  }, [selectedEmployee, entries]);
+    if (selectedEmployee && !onMap.some((e) => e.employeeId === selectedEmployee)) setSelectedEmployee(null);
+  }, [selectedEmployee, onMap]);
 
   const selectedDistrictName = useMemo(
     () => districts.find((d) => d.id === districtFilter)?.name ?? null,
@@ -166,12 +240,12 @@ export function LiveMap() {
       const isSelected = !!norm && !!selectedDistrictName && norm === normalizeDistrictName(selectedDistrictName);
       const isHovered = !isSelected && !!norm && !!hoveredDistrict && norm === hoveredDistrict;
       return {
-        fillColor: "#2563eb",
-        fillOpacity: isSelected ? 0.15 : isHovered ? 0.08 : 0,
-        strokeColor: isSelected ? "#1d4ed8" : isHovered ? "#60a5fa" : "#94a3b8",
-        strokeWeight: isSelected ? 3 : isHovered ? 2 : 1,
-        strokeOpacity: isSelected ? 1 : isHovered ? 0.9 : 0.5,
-        zIndex: isSelected ? 2 : isHovered ? 1.5 : 1,
+        fillColor: COLOR_ACTIVE,
+        fillOpacity: isSelected ? 0.08 : isHovered ? 0.06 : 0,
+        strokeColor: isSelected ? "#0f766e" : isHovered ? "#14b8a6" : "#64748b",
+        strokeWeight: isSelected ? 2.5 : isHovered ? 1.5 : 0.7,
+        strokeOpacity: isSelected ? 1 : isHovered ? 0.9 : 0.45,
+        zIndex: isSelected ? 4 : isHovered ? 3 : 2,
         clickable: true,
       };
     },
@@ -231,7 +305,7 @@ export function LiveMap() {
     if (!map || !dataLayer || !geoReady) return;
 
     if (!selectedDistrictName) {
-      map.fitBounds(TN_BOUNDS);
+      map.fitBounds(TN_BOUNDS, 24);
       return;
     }
 
@@ -245,63 +319,25 @@ export function LiveMap() {
         feature.getGeometry()?.forEachLatLng((latLng) => bounds.extend(latLng));
       }
     });
-    if (found) map.fitBounds(bounds);
+    if (found) map.fitBounds(bounds, 48);
   }, [selectedDistrictName, geoReady]);
 
+  const resetView = useCallback(() => {
+    setSelectedEmployee(null);
+    if (districtFilter) setDistrictFilter("");
+    else mapRef.current?.fitBounds(TN_BOUNDS, 24);
+  }, [districtFilter]);
+
+  const where = selectedDistrictName ?? "Tamil Nadu";
+
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Live Map"
-        description="On-duty salespeople update every 25 seconds. Grey markers haven't reported for over 10 minutes."
-        actions={
-        <div className="w-56">
-          <Select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)}>
-            <option value="">All districts</option>
-            {districts.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        }
-      />
-
-      {!import.meta.env.VITE_GOOGLE_MAPS_API_KEY && (
-        <Card className="border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
-          Set VITE_GOOGLE_MAPS_API_KEY in admin-web/.env to load the map.
-        </Card>
-      )}
-
-      <Card className="relative overflow-hidden">
-        {isLoaded && (
-          <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-col gap-2">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-sm text-slate-700">
-                <span className="font-semibold text-slate-900">{visibleEntries.length}</span>{" "}
-                employee{visibleEntries.length === 1 ? "" : "s"} on duty
-                {selectedDistrictName ? ` in ${selectedDistrictName}` : ""}
-              </span>
-            </div>
-            {selectedDistrictName && (
-              <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm backdrop-blur">
-                <span className="h-2.5 w-3.5 rounded-sm border-2 border-blue-700 bg-blue-600/15" />
-                {selectedDistrictName} boundary
-                <button
-                  onClick={() => setDistrictFilter("")}
-                  className="font-medium text-blue-600 hover:underline"
-                >
-                  Reset
-                </button>
-              </div>
-            )}
+    <div className="flex flex-col lg:flex-row">
+      <div className="relative h-[calc(100vh-57px)] flex-1 lg:h-screen" style={{ backgroundColor: MASK_COLOR }}>
+        {!import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
+          <div className="flex h-full items-center justify-center p-6 text-sm text-slate-500">
+            Set VITE_GOOGLE_MAPS_API_KEY in admin-web/.env to load the map.
           </div>
-        )}
-        {isLoaded ? (
+        ) : isLoaded ? (
           <GoogleMap
             mapContainerStyle={containerStyle}
             center={TAMIL_NADU_CENTER}
@@ -309,43 +345,91 @@ export function LiveMap() {
             options={MAP_OPTIONS}
             onLoad={(map) => {
               mapRef.current = map;
-              map.fitBounds(TN_BOUNDS);
+              map.fitBounds(TN_BOUNDS, 24);
             }}
             onUnmount={() => {
               mapRef.current = null;
             }}
+            onClick={() => setSelectedEmployee(null)}
           >
+            {mask && (
+              <>
+                {/* Hides every neighbouring state, the sea and Sri Lanka. A
+                    Data layer polygon rather than PolygonF: Data.Polygon
+                    treats every ring after the first as a hole regardless of
+                    winding, which PolygonF does not reliably do. */}
+                <DataF
+                  onLoad={(layer) => {
+                    layer.add({ geometry: new google.maps.Data.Polygon([mask.outer, ...mask.tn]) });
+                    layer.setStyle({
+                      fillColor: MASK_COLOR,
+                      fillOpacity: 1,
+                      strokeWeight: 0,
+                      clickable: false,
+                      zIndex: 1,
+                    });
+                  }}
+                />
+                {/* Soft halo, then a crisp line, for the state border. */}
+                <PolygonF
+                  paths={mask.tn}
+                  options={{
+                    fillOpacity: 0,
+                    strokeColor: "#334155",
+                    strokeOpacity: 0.12,
+                    strokeWeight: 8,
+                    clickable: false,
+                    zIndex: 5,
+                  }}
+                />
+                <PolygonF
+                  paths={mask.tn}
+                  options={{
+                    fillOpacity: 0,
+                    strokeColor: "#334155",
+                    strokeOpacity: 0.8,
+                    strokeWeight: 1.5,
+                    clickable: false,
+                    zIndex: 6,
+                  }}
+                />
+              </>
+            )}
             <DataF
               onLoad={onDataLoad}
               onClick={onDataClick}
               onMouseOver={onDataMouseOver}
               onMouseOut={onDataMouseOut}
             />
-            {visibleEntries.map((e) => {
-              const isStale = now - new Date(e.updatedAt).getTime() > STALE_AFTER_MS;
+            {onMap.map((e) => {
+              const isStale = e.status === "stale";
+              const isSelected = selectedEmployee === e.employeeId;
               return (
                 <MarkerF
                   key={e.employeeId}
                   position={{ lat: e.lat, lng: e.lng }}
                   onClick={() => onSelectEmployee(e.employeeId)}
+                  title={e.name}
+                  zIndex={isSelected ? 1000 : isStale ? 10 : 100}
+                  label={{ text: initials(e.name), color: "#ffffff", fontSize: "10px", fontWeight: "600" }}
                   icon={{
                     path: google.maps.SymbolPath.CIRCLE,
-                    scale: 9,
-                    fillColor: isStale ? "#94a3b8" : "#2563eb",
-                    fillOpacity: isStale ? 0.6 : 1,
-                    strokeColor: "#ffffff",
-                    strokeWeight: 2.5,
+                    scale: isSelected ? 15 : 13,
+                    fillColor: isStale ? COLOR_STALE : COLOR_ACTIVE,
+                    fillOpacity: 1,
+                    strokeColor: isSelected ? "#134e4a" : "#ffffff",
+                    strokeWeight: isSelected ? 3 : 2.5,
                   }}
                 >
-                  {selectedEmployee === e.employeeId && (
-                    <InfoWindowF
-                      position={{ lat: e.lat, lng: e.lng }}
-                      onCloseClick={() => setSelectedEmployee(null)}
-                    >
-                      <div className="text-sm p-1">
+                  {isSelected && (
+                    <InfoWindowF position={{ lat: e.lat, lng: e.lng }} onCloseClick={() => setSelectedEmployee(null)}>
+                      <div className="min-w-40 space-y-1 p-1 text-sm">
                         <div className="font-semibold text-slate-900">{e.name}</div>
-                        <div className={isStale ? "text-xs text-amber-600" : "text-xs text-slate-500"}>
-                          {isStale ? "Last seen" : "Updated"} {new Date(e.updatedAt).toLocaleTimeString()}
+                        {e.districtId && (
+                          <div className="text-xs text-slate-500">{districtNameById.get(e.districtId)}</div>
+                        )}
+                        <div className={isStale ? "text-xs font-medium text-amber-600" : "text-xs text-slate-500"}>
+                          {isStale ? "No signal since" : "Updated"} {timeAgo(e.updatedAt, now)}
                         </div>
                       </div>
                     </InfoWindowF>
@@ -355,13 +439,151 @@ export function LiveMap() {
             })}
           </GoogleMap>
         ) : (
-          <div style={containerStyle} className="flex items-center justify-center text-slate-400">
-            Loading map…
-          </div>
+          <div className="flex h-full items-center justify-center text-sm text-slate-400">Loading map…</div>
         )}
-      </Card>
+
+        {isLoaded && (
+          <>
+            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur">
+              {onMap.length > 0 ? (
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                </span>
+              ) : (
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+              )}
+              <span className="text-sm text-slate-700">
+                {onMap.length > 0 ? (
+                  <>
+                    <span className="font-semibold text-slate-900">{onMap.length}</span> on duty in {where}
+                  </>
+                ) : (
+                  <>Nobody on duty in {where}</>
+                )}
+              </span>
+            </div>
+
+            <button
+              onClick={resetView}
+              className="absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-700 shadow-md backdrop-blur transition hover:bg-white hover:text-slate-900"
+            >
+              <Crosshair className="h-3.5 w-3.5" />
+              {selectedDistrictName ? "All of Tamil Nadu" : "Recenter"}
+            </button>
+
+            <div className="pointer-events-none absolute bottom-6 left-4 z-10 flex items-center gap-4 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-md backdrop-blur">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_ACTIVE }} />
+                Active
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_STALE }} />
+                No signal 10+ min
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
+      <aside className="flex w-full flex-col border-t border-slate-200 bg-white lg:h-screen lg:w-80 lg:border-l lg:border-t-0">
+        <div className="space-y-3 border-b border-slate-100 px-4 py-4">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-slate-900">Live Map</h1>
+            <p className="text-xs text-slate-500">Real-time positions of field sales staff.</p>
+          </div>
+          <Select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)}>
+            <option value="">All districts</option>
+            {districts.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <Stat label="Active" value={activeCount} tone="text-teal-600" />
+            <Stat label="No signal" value={staleCount} tone="text-slate-500" />
+            <Stat label="Offline" value={offline.length} tone="text-slate-400" />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {onMap.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+              <MapPin className="h-6 w-6 text-slate-300" />
+              <div className="text-sm font-medium text-slate-700">Nobody on duty</div>
+              <div className="text-xs text-slate-500">Salespeople appear here once they start duty in the app.</div>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {onMap.map((e) => {
+                const isStale = e.status === "stale";
+                const isSelected = selectedEmployee === e.employeeId;
+                return (
+                  <li key={e.employeeId}>
+                    <button
+                      onClick={() => focusEmployee(e)}
+                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition ${
+                        isSelected ? "bg-teal-50" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <span
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                        style={{ backgroundColor: isStale ? COLOR_STALE : COLOR_ACTIVE }}
+                      >
+                        {initials(e.name)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-slate-900">{e.name}</span>
+                        <span className="block truncate text-xs text-slate-500">
+                          {(e.districtId && districtNameById.get(e.districtId)) || "No district"}
+                        </span>
+                      </span>
+                      <span className={`shrink-0 text-[11px] ${isStale ? "text-amber-600" : "text-slate-400"}`}>
+                        {timeAgo(e.updatedAt, now)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {offline.length > 0 && (
+            <div className="border-t border-slate-100">
+              <div className="flex items-center gap-1.5 px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <WifiOff className="h-3 w-3" />
+                Offline · not reporting for 2+ hours
+              </div>
+              <ul>
+                {offline.map((e) => (
+                  <li key={e.employeeId} className="flex items-center gap-3 px-4 py-2 opacity-70">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-500">
+                      {initials(e.name)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-slate-700">{e.name}</span>
+                      <span className="block truncate text-xs text-slate-400">
+                        {(e.districtId && districtNameById.get(e.districtId)) || "No district"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[11px] text-slate-400">Last seen {timeAgo(e.updatedAt, now)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }
 
-
+function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-2 py-2">
+      <div className={`text-lg font-semibold leading-none ${tone}`}>{value}</div>
+      <div className="mt-1 text-[11px] text-slate-500">{label}</div>
+    </div>
+  );
+}

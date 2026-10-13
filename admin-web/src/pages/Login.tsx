@@ -39,11 +39,11 @@ export function Login() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-slate-900 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-blue-600/30 blur-3xl" />
-        <div className="absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-emerald-500/20 blur-3xl" />
+      <div className="relative hidden overflow-hidden bg-gradient-to-br from-teal-700 via-teal-800 to-emerald-900 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-teal-300/20 blur-3xl" />
+        <div className="absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-emerald-400/20 blur-3xl" />
         <div className="relative flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25">
             <PaintBucket className="h-5 w-5" />
           </div>
           <span className="text-lg font-semibold">PaintTracker</span>
@@ -56,23 +56,23 @@ export function Login() {
             {highlights.map(({ icon: Icon, title, text }) => (
               <li key={title} className="flex gap-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                  <Icon className="h-5 w-5 text-blue-300" />
+                  <Icon className="h-5 w-5 text-teal-100" />
                 </div>
                 <div>
                   <div className="font-medium">{title}</div>
-                  <div className="text-sm text-slate-400">{text}</div>
+                  <div className="text-sm text-teal-100/80">{text}</div>
                 </div>
               </li>
             ))}
           </ul>
         </div>
-        <div className="relative text-xs text-slate-500">Admin access only</div>
+        <div className="relative text-xs text-teal-100/60">Admin access only</div>
       </div>
 
       <div className="flex items-center justify-center bg-slate-50 px-4 py-12">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-600 text-white">
               <PaintBucket className="h-5 w-5" />
             </div>
             <span className="text-lg font-semibold text-slate-900">PaintTracker</span>
