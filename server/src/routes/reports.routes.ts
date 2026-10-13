@@ -29,6 +29,9 @@ reportsRouter.get("/summary", async (req, res) => {
   const orderWhere: Record<string, unknown> = {};
   if (districtId) orderWhere.districtId = districtId;
   if (dateFilter) orderWhere.createdAt = dateFilter;
+  // Sales figures leave out cancelled orders: that money never came in. The
+  // status breakdown and pending list still see every order.
+  const salesWhere = { ...orderWhere, status: { not: "cancelled" as const } };
 
   const visitWhere: Record<string, unknown> = {};
   if (districtId) visitWhere.districtId = districtId;
@@ -54,23 +57,21 @@ reportsRouter.get("/summary", async (req, res) => {
     ordersByDistrictAll,
     visitsByDistrictAll,
   ] = await Promise.all([
-    prisma.order.aggregate({ where: orderWhere, _sum: { totalAmount: true }, _count: true }),
+    prisma.order.aggregate({ where: salesWhere, _sum: { totalAmount: true }, _count: true }),
     prisma.visit.count({ where: visitWhere }),
     prisma.employeeLocation.count({ where: { onDuty: true } }),
     prisma.order.groupBy({
       by: ["districtId"],
-      where: orderWhere,
+      where: salesWhere,
       _sum: { totalAmount: true },
       _count: true,
     }),
     (() => {
-      const conditions: Prisma.Sql[] = [];
+      const conditions: Prisma.Sql[] = [Prisma.sql`"status" <> 'cancelled'`];
       if (districtId) conditions.push(Prisma.sql`"districtId" = ${districtId}`);
       if (dateFilter?.gte) conditions.push(Prisma.sql`"createdAt" >= ${dateFilter.gte}`);
       if (dateFilter?.lte) conditions.push(Prisma.sql`"createdAt" <= ${dateFilter.lte}`);
-      const where = conditions.length
-        ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
-        : Prisma.empty;
+      const where = Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`;
       return prisma.$queryRaw<{ day: string; total: number; count: bigint }[]>`
         -- createdAt is a UTC timestamp without zone: tag it as UTC, then convert to IST before bucketing by day.
         SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') as day, SUM("totalAmount")::float as total, COUNT(*) as count
@@ -80,14 +81,14 @@ reportsRouter.get("/summary", async (req, res) => {
       `;
     })(),
     prisma.orderItem.findMany({
-      where: { order: orderWhere },
+      where: { order: salesWhere },
       select: {
         quantity: true,
         unitPrice: true,
         variant: { select: { product: { select: { id: true, name: true, category: true } } } },
       },
     }),
-    prisma.order.groupBy({ by: ["employeeId"], where: orderWhere, _sum: { totalAmount: true }, _count: true }),
+    prisma.order.groupBy({ by: ["employeeId"], where: salesWhere, _sum: { totalAmount: true }, _count: true }),
     prisma.visit.groupBy({ by: ["employeeId"], where: visitWhere, _count: true }),
     prisma.order.groupBy({ by: ["status"], where: orderWhere, _count: true }),
     prisma.order.findMany({

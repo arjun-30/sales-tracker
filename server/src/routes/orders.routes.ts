@@ -46,6 +46,18 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
     return res.status(400).json({ error: "One or more product sizes are not found or no longer available" });
   }
 
+  // An unpriced size would make a ₹0 order the office then has to chase.
+  const unpriced = variants.filter((v) => v.price.lte(0));
+  if (unpriced.length > 0) {
+    const names = await prisma.productVariant.findMany({
+      where: { id: { in: unpriced.map((v) => v.id) } },
+      select: { sizeLabel: true, product: { select: { name: true } } },
+    });
+    return res.status(400).json({
+      error: `No price set yet for ${names.map((n) => `${n.product.name} (${n.sizeLabel})`).join(", ")}. Ask the office to set it.`,
+    });
+  }
+
   const priceById = new Map(variants.map((v) => [v.id, v.price]));
   const orderItems = items.map((i) => ({
     variantId: i.variantId,

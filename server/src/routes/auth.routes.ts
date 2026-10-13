@@ -40,6 +40,7 @@ authRouter.post("/login", loginPerIpLimiter, loginPerPhoneLimiter, async (req, r
       id: user.id,
       name: user.name,
       phone: user.phone,
+      employeeCode: user.employeeCode,
       role: user.role,
       districtId: user.districtId,
     },
@@ -69,7 +70,7 @@ authRouter.post("/refresh", async (req, res) => {
 authRouter.get("/me", requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.sub },
-    select: { id: true, name: true, phone: true, role: true, districtId: true, district: true },
+    select: { id: true, name: true, phone: true, employeeCode: true, role: true, districtId: true, district: true },
   });
   if (!user) return res.status(404).json({ error: "User not found" });
   res.json({ user });

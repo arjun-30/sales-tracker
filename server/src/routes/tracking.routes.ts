@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { getIO } from "../socket";
+import { closeDuty, startDutySession } from "../lib/duty";
 
 export const trackingRouter = Router();
 
@@ -71,19 +72,20 @@ trackingRouter.post("/duty", requireRole("sales_employee"), async (req, res) => 
   const { onDuty, lat, lng } = parsed.data;
   const userId = req.user!.sub;
 
-  const existing = await prisma.employeeLocation.findUnique({ where: { userId } });
-  const location = await prisma.employeeLocation.upsert({
-    where: { userId },
-    update: {
-      onDuty,
-      ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
-    },
-    create: {
-      userId,
-      onDuty,
-      lat: lat ?? existing?.lat ?? 0,
-      lng: lng ?? existing?.lng ?? 0,
-    },
+  // The on/off flag and the duty session that hours are counted from change
+  // together, so the two can never disagree.
+  const location = await prisma.$transaction(async (tx) => {
+    const updated = await tx.employeeLocation.upsert({
+      where: { userId },
+      update: {
+        onDuty,
+        ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
+      },
+      create: { userId, onDuty, lat: lat ?? 0, lng: lng ?? 0 },
+    });
+    if (onDuty) await startDutySession(tx, userId);
+    else await closeDuty(tx, userId, "manual");
+    return updated;
   });
 
   const user = await prisma.user.findUnique({

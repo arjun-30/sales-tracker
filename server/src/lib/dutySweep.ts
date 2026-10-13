@@ -1,5 +1,6 @@
 import { prisma } from "../db";
 import { getIO } from "../socket";
+import { closeDuty } from "./duty";
 
 // A phone that dies, loses signal for good or has the app force-killed never
 // sends "off duty", so its row would stay onDuty forever and keep showing up
@@ -32,6 +33,9 @@ export async function sweepStaleDuty(timeoutMinutes = DUTY_TIMEOUT_MINUTES): Pro
   `;
 
   for (const row of rows) {
+    // Hours stop at the last ping, not at the sweep: the silent stretch was
+    // not time worked.
+    await prisma.$transaction((tx) => closeDuty(tx, row.userId, "timeout", row.updatedAt));
     getIO().to("role:admin").emit("employee:duty", {
       employeeId: row.userId,
       name: row.name,

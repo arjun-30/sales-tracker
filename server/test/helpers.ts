@@ -21,7 +21,7 @@ export const PASSWORD = "secret123";
 
 export async function resetDb() {
   await prisma.$executeRawUnsafe(`
-    TRUNCATE "OrderItem", "Order", "Visit", "LocationHistory", "EmployeeLocation",
+    TRUNCATE "OrderItem", "Order", "Visit", "LocationHistory", "EmployeeLocation", "DutySession",
              "ProductVariant", "Product", "User", "District" CASCADE
   `);
 }
@@ -38,10 +38,10 @@ export async function seedFixtures() {
     data: { name: "Admin", phone: "9999999999", passwordHash, role: "admin" },
   });
   const empA = await prisma.user.create({
-    data: { name: "Emp A", phone: "9000000001", passwordHash, role: "sales_employee", districtId: chennai.id },
+    data: { name: "Emp A", phone: "9000000001", employeeCode: "RLX001", passwordHash, role: "sales_employee", districtId: chennai.id },
   });
   const empB = await prisma.user.create({
-    data: { name: "Emp B", phone: "9000000002", passwordHash, role: "sales_employee", districtId: madurai.id },
+    data: { name: "Emp B", phone: "9000000002", employeeCode: "RLX002", passwordHash, role: "sales_employee", districtId: madurai.id },
   });
   const product = await prisma.product.create({
     data: {

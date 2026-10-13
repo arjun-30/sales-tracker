@@ -12,6 +12,12 @@ enum Role {
   sales_employee
 }
 
+enum DutyEndReason {
+  manual
+  timeout
+  deactivated
+}
+
 enum OrderStatus {
   pending
   confirmed
@@ -35,6 +41,8 @@ model User {
   id           String   @id @default(cuid())
   name         String
   phone        String   @unique
+  // Short staff ID (RLX001, RLX002, …) for sales employees; admins have none.
+  employeeCode String?  @unique
   passwordHash String
   role         Role
   districtId   String?
@@ -47,6 +55,23 @@ model User {
   locationHistory  LocationHistory[]
   orders           Order[]
   visits           Visit[]
+  dutySessions     DutySession[]
+}
+
+// One stretch of on-duty time. Opened when the employee goes on duty, closed
+// when they go off duty, are switched off by the silence sweep (endedAt = last
+// location ping, not the sweep time), or are deactivated. Hours worked are the
+// sum of these.
+model DutySession {
+  id        String         @id @default(cuid())
+  userId    String
+  startedAt DateTime       @default(now())
+  endedAt   DateTime?
+  endReason DutyEndReason?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
 }
 
 model EmployeeLocation {

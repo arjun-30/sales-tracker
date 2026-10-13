@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../src/db";
-import { api, bearer, login, resetDb, seedFixtures, type Fixtures } from "./helpers";
+import { api, bearer, ensureSocket, login, resetDb, seedFixtures, type Fixtures } from "./helpers";
 
 let f: Fixtures;
 let empA: string;
@@ -10,8 +10,13 @@ beforeEach(async () => {
   f = await seedFixtures();
   empA = (await login("9000000001")).accessToken;
   empB = (await login("9000000002")).accessToken;
+  ensureSocket();
+  for (const token of [empA, empB]) await goOnDuty(token, true);
 });
 afterAll(() => prisma.$disconnect());
+
+const goOnDuty = (token: string, onDuty: boolean) =>
+  api().post("/api/tracking/duty").set(bearer(token)).send({ onDuty, lat: 13.05, lng: 80.25 });
 
 const checkIn = (token: string, shopName = "Sri Murugan Paints") =>
   api()
@@ -20,6 +25,21 @@ const checkIn = (token: string, shopName = "Sri Murugan Paints") =>
     .send({ shopName, lat: 13.05, lng: 80.25, notes: "first call" });
 
 describe("shop visits", () => {
+  it("checking in while off duty returns 409", async () => {
+    await goOnDuty(empA, false);
+    const res = await checkIn(empA);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/on duty/i);
+  });
+
+  it("going off duty checks out a visit left open", async () => {
+    const visit = (await checkIn(empA)).body.visit;
+    await goOnDuty(empA, false);
+    const closed = await prisma.visit.findUniqueOrThrow({ where: { id: visit.id } });
+    expect(closed.checkOutAt).not.toBeNull();
+    expect(closed.checkOutLat).toBe(13.05);
+  });
+
   it("TC-13 check-in records GPS and the employee's district", async () => {
     const res = await checkIn(empA);
     expect(res.status).toBe(201);

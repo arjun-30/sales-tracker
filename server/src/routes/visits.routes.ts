@@ -28,9 +28,16 @@ visitsRouter.post("/checkin", requireRole("sales_employee"), async (req, res) =>
     return res.status(409).json({ error: "You already have an open visit. Check out first." });
   }
 
-  const employee = await prisma.user.findUnique({ where: { id: employeeId } });
+  const employee = await prisma.user.findUnique({
+    where: { id: employeeId },
+    include: { employeeLocation: { select: { onDuty: true } } },
+  });
   if (!employee?.districtId) {
     return res.status(400).json({ error: "Employee has no district assigned" });
+  }
+  // Visits count towards the working day, so they only happen on duty.
+  if (!employee.employeeLocation?.onDuty) {
+    return res.status(409).json({ error: "Go on duty before checking in to a shop." });
   }
 
   const { shopName, lat, lng, notes } = parsed.data;
