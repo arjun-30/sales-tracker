@@ -54,22 +54,22 @@ export function Layout() {
     .toUpperCase();
 
   const sidebar = (
-    <div className="flex h-full flex-col border-r border-neutral-200 bg-white">
+    <div className="flex h-full flex-col bg-[#1c1c1c] text-neutral-300">
       <div className="paint-stripe h-[3px] shrink-0" />
-      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-neutral-200 px-5">
+      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.08] px-5">
         <img src="/roalux-logo.png" alt="Roalux" className="h-8 w-auto" />
-        <div className="h-6 w-px bg-neutral-200" />
-        <div className="text-[13px] font-semibold leading-tight text-neutral-800">
+        <div className="h-6 w-px bg-white/15" />
+        <div className="text-[13px] font-semibold leading-tight text-white">
           Sales
           <br />
-          <span className="font-normal text-neutral-500">Console</span>
+          <span className="font-normal text-neutral-400">Console</span>
         </div>
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {navGroups.map((group) => (
           <div key={group.label}>
-            <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+            <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               {group.label}
             </div>
             <div className="space-y-0.5">
@@ -82,14 +82,14 @@ export function Layout() {
                   className={({ isActive }) =>
                     `relative flex h-9 items-center gap-3 rounded-md px-3 text-[13.5px] transition-colors ${
                       isActive
-                        ? "bg-neutral-100 font-semibold text-neutral-900 before:absolute before:inset-y-2 before:-left-3 before:w-[3px] before:rounded-r before:bg-brand-600"
-                        : "font-medium text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                        ? "bg-white/[0.08] font-semibold text-white before:absolute before:inset-y-2 before:-left-3 before:w-[3px] before:rounded-r before:bg-brand-500"
+                        : "font-medium text-neutral-400 hover:bg-white/[0.04] hover:text-white"
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      <Icon className={`h-[17px] w-[17px] ${isActive ? "text-neutral-900" : "text-neutral-400"}`} />
+                      <Icon className={`h-[17px] w-[17px] ${isActive ? "text-brand-400" : "text-neutral-500"}`} />
                       {label}
                     </>
                   )}
@@ -100,20 +100,20 @@ export function Layout() {
         ))}
       </nav>
 
-      <div className="border-t border-neutral-200 p-3">
+      <div className="border-t border-white/[0.08] p-3">
         <div className="flex items-center gap-3 rounded-md px-2 py-1.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-xs font-semibold text-white">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-600 text-xs font-semibold text-white">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-semibold text-neutral-900">{user?.name}</div>
+            <div className="truncate text-[13px] font-semibold text-white">{user?.name}</div>
             <div className="text-xs text-neutral-500">Administrator</div>
           </div>
           <button
             onClick={logout}
             title="Log out"
             aria-label="Log out"
-            className="rounded-md p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+            className="rounded-md p-2 text-neutral-500 transition-colors hover:bg-white/10 hover:text-white"
           >
             <LogOut className="h-4 w-4" />
           </button>

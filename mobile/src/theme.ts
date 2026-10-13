@@ -1,8 +1,9 @@
 // Shared look for every screen: change a value here, not in a screen's StyleSheet.
 export const colors = {
-  primary: "#0277bd",
-  primaryDark: "#065f98",
-  primarySoft: "#eef7fd",
+  // Neutral black, matching the admin panel; colour is kept for status only.
+  primary: "#171717",
+  primaryDark: "#000000",
+  primarySoft: "#f5f5f5",
   // Neutral near-black for dark surfaces (no blue cast).
   ink: "#171717",
   inkSoft: "#262626",
@@ -12,13 +13,13 @@ export const colors = {
   warningSoft: "#fffbeb",
   danger: "#dc2626",
   dangerSoft: "#fef2f2",
-  text: "#0f172a",
-  textMuted: "#64748b",
-  textFaint: "#94a3b8",
-  border: "#e2e8f0",
-  borderStrong: "#cbd5e1",
+  text: "#171717",
+  textMuted: "#737373",
+  textFaint: "#a3a3a3",
+  border: "#e5e5e5",
+  borderStrong: "#d4d4d4",
   surface: "#ffffff",
-  background: "#f4f6f9",
+  background: "#f5f5f5",
 };
 
 // The six swatches from the Roalux logo. Accents only, never body text.
@@ -28,7 +29,7 @@ export const radius = { sm: 8, md: 12, lg: 16, pill: 999 };
 
 export const statusTone = {
   pending: { fg: colors.warning, bg: colors.warningSoft, label: "Pending" },
-  confirmed: { fg: colors.primary, bg: colors.primarySoft, label: "Confirmed" },
+  confirmed: { fg: "#0369a1", bg: "#f0f9ff", label: "Confirmed" },
   delivered: { fg: colors.success, bg: colors.successSoft, label: "Delivered" },
   cancelled: { fg: colors.danger, bg: colors.dangerSoft, label: "Cancelled" },
 } as const;
