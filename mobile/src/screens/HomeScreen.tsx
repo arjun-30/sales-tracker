@@ -106,7 +106,9 @@ export default function HomeScreen() {
             </Text>
             <View style={styles.districtRow}>
               <Ionicons name="location-outline" size={14} color={colors.textMuted} />
-              <Text style={styles.district}>{user?.district?.name ?? "No district assigned"}</Text>
+              <Text style={styles.district}>
+                {[user?.employeeCode, user?.district?.name ?? "No district assigned"].filter(Boolean).join("  ·  ")}
+              </Text>
             </View>
           </View>
         </View>

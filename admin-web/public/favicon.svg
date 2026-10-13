@@ -8,5 +8,5 @@
     <rect x="42.6" width="11" height="64" fill="#00a6e6"/>
     <rect x="53.3" width="11" height="64" fill="#ffe500"/>
   </g>
-  <text x="32" y="46" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="40" fill="#fff" stroke="#0b111e" stroke-opacity=".25" stroke-width="1.5">R</text>
+  <text x="32" y="46" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="40" fill="#fff" stroke="#171717" stroke-opacity=".25" stroke-width="1.5">R</text>
 </svg>

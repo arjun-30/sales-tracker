@@ -199,10 +199,15 @@ export default function NewOrderScreen() {
                         {v.price > 0 ? formatINR(v.price) : "Price not set"}
                       </Text>
                     </View>
-                    <Stepper
-                      value={draftQty[v.id] ?? 0}
-                      onChange={(q) => setDraftQty((prev) => ({ ...prev, [v.id]: q }))}
-                    />
+                    {/* The server refuses unpriced sizes; ask the office rather than send a ₹0 order. */}
+                    {v.price > 0 ? (
+                      <Stepper
+                        value={draftQty[v.id] ?? 0}
+                        onChange={(q) => setDraftQty((prev) => ({ ...prev, [v.id]: q }))}
+                      />
+                    ) : (
+                      <Text style={styles.askOffice}>{"Ask office\nto set price"}</Text>
+                    )}
                   </View>
                 ))}
                 <Button label="Add to order" icon="cart-outline" variant="success" onPress={addToCart} />
@@ -310,6 +315,7 @@ const styles = StyleSheet.create({
   notFoundText: { color: colors.danger, fontSize: 13, flex: 1 },
   found: { gap: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
   foundHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  askOffice: { fontSize: 12, color: colors.textMuted, textAlign: "right", fontWeight: "600" },
   foundName: { fontSize: 16, fontWeight: "700", color: colors.text, flexShrink: 1 },
   code: {
     fontSize: 12,

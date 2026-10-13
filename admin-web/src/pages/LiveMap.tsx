@@ -21,7 +21,7 @@ const TN_RESTRICTION_BOUNDS = { north: 16.5, south: 5.5, west: 71, east: 86.5 };
 
 // Everything outside Tamil Nadu is painted over with this, so the state reads
 // as the only land on the map.
-const MASK_COLOR = "#e8edeb";
+const MASK_COLOR = "#ececec";
 
 const MAP_OPTIONS: google.maps.MapOptions = {
   disableDefaultUI: true,
@@ -72,8 +72,8 @@ const STALE_AFTER_MS = 10 * 60 * 1000;
 // as offline instead.
 const OFFLINE_AFTER_MS = 2 * 60 * 60 * 1000;
 
-const COLOR_ACTIVE = "#0277bd";
-const COLOR_STALE = "#94a3b8";
+const COLOR_ACTIVE = "#171717";
+const COLOR_STALE = "#a3a3a3";
 
 type Status = "active" | "stale" | "offline";
 
@@ -242,7 +242,7 @@ export function LiveMap() {
       return {
         fillColor: COLOR_ACTIVE,
         fillOpacity: isSelected ? 0.08 : isHovered ? 0.06 : 0,
-        strokeColor: isSelected ? "#0f766e" : isHovered ? "#14b8a6" : "#64748b",
+        strokeColor: isSelected ? "#d4202a" : isHovered ? "#404040" : "#737373",
         strokeWeight: isSelected ? 2.5 : isHovered ? 1.5 : 0.7,
         strokeOpacity: isSelected ? 1 : isHovered ? 0.9 : 0.45,
         zIndex: isSelected ? 4 : isHovered ? 3 : 2,
@@ -334,7 +334,7 @@ export function LiveMap() {
     <div className="flex flex-col lg:flex-row">
       <div className="relative h-[calc(100vh-57px)] flex-1 lg:h-screen" style={{ backgroundColor: MASK_COLOR }}>
         {!import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
-          <div className="flex h-full items-center justify-center p-6 text-sm text-slate-500">
+          <div className="flex h-full items-center justify-center p-6 text-sm text-neutral-500">
             Set VITE_GOOGLE_MAPS_API_KEY in admin-web/.env to load the map.
           </div>
         ) : isLoaded ? (
@@ -375,7 +375,7 @@ export function LiveMap() {
                   paths={mask.tn}
                   options={{
                     fillOpacity: 0,
-                    strokeColor: "#334155",
+                    strokeColor: "#404040",
                     strokeOpacity: 0.12,
                     strokeWeight: 8,
                     clickable: false,
@@ -386,7 +386,7 @@ export function LiveMap() {
                   paths={mask.tn}
                   options={{
                     fillOpacity: 0,
-                    strokeColor: "#334155",
+                    strokeColor: "#404040",
                     strokeOpacity: 0.8,
                     strokeWeight: 1.5,
                     clickable: false,
@@ -417,18 +417,18 @@ export function LiveMap() {
                     scale: isSelected ? 15 : 13,
                     fillColor: isStale ? COLOR_STALE : COLOR_ACTIVE,
                     fillOpacity: 1,
-                    strokeColor: isSelected ? "#134e4a" : "#ffffff",
+                    strokeColor: isSelected ? "#d4202a" : "#ffffff",
                     strokeWeight: isSelected ? 3 : 2.5,
                   }}
                 >
                   {isSelected && (
                     <InfoWindowF position={{ lat: e.lat, lng: e.lng }} onCloseClick={() => setSelectedEmployee(null)}>
                       <div className="min-w-40 space-y-1 p-1 text-sm">
-                        <div className="font-semibold text-slate-900">{e.name}</div>
+                        <div className="font-semibold text-neutral-900">{e.name}</div>
                         {e.districtId && (
-                          <div className="text-xs text-slate-500">{districtNameById.get(e.districtId)}</div>
+                          <div className="text-xs text-neutral-500">{districtNameById.get(e.districtId)}</div>
                         )}
-                        <div className={isStale ? "text-xs font-medium text-amber-600" : "text-xs text-slate-500"}>
+                        <div className={isStale ? "text-xs font-medium text-amber-600" : "text-xs text-neutral-500"}>
                           {isStale ? "No signal since" : "Updated"} {timeAgo(e.updatedAt, now)}
                         </div>
                       </div>
@@ -439,24 +439,24 @@ export function LiveMap() {
             })}
           </GoogleMap>
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-slate-400">Loading map…</div>
+          <div className="flex h-full items-center justify-center text-sm text-neutral-400">Loading map…</div>
         )}
 
         {isLoaded && (
           <>
-            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur">
+            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur">
               {onMap.length > 0 ? (
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                 </span>
               ) : (
-                <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+                <span className="h-2.5 w-2.5 rounded-full bg-neutral-300" />
               )}
-              <span className="text-sm text-slate-700">
+              <span className="text-sm text-neutral-700">
                 {onMap.length > 0 ? (
                   <>
-                    <span className="font-semibold text-slate-900">{onMap.length}</span> on duty in {where}
+                    <span className="font-semibold text-neutral-900">{onMap.length}</span> on duty in {where}
                   </>
                 ) : (
                   <>Nobody on duty in {where}</>
@@ -466,13 +466,13 @@ export function LiveMap() {
 
             <button
               onClick={resetView}
-              className="absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-700 shadow-md backdrop-blur transition hover:bg-white hover:text-slate-900"
+              className="absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white/95 px-3 py-2 text-xs font-medium text-neutral-700 shadow-md backdrop-blur transition hover:bg-white hover:text-neutral-900"
             >
               <Crosshair className="h-3.5 w-3.5" />
               {selectedDistrictName ? "All of Tamil Nadu" : "Recenter"}
             </button>
 
-            <div className="pointer-events-none absolute bottom-6 left-4 z-10 flex items-center gap-4 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-md backdrop-blur">
+            <div className="pointer-events-none absolute bottom-6 left-4 z-10 flex items-center gap-4 rounded-lg border border-neutral-200 bg-white/95 px-3 py-2 text-xs text-neutral-600 shadow-md backdrop-blur">
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_ACTIVE }} />
                 Active
@@ -486,11 +486,11 @@ export function LiveMap() {
         )}
       </div>
 
-      <aside className="flex w-full flex-col border-t border-slate-200 bg-white lg:h-screen lg:w-80 lg:border-l lg:border-t-0">
-        <div className="space-y-3 border-b border-slate-100 px-4 py-4">
+      <aside className="flex w-full flex-col border-t border-neutral-200 bg-white lg:h-screen lg:w-80 lg:border-l lg:border-t-0">
+        <div className="space-y-3 border-b border-neutral-100 px-4 py-4">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-slate-900">Live Map</h1>
-            <p className="text-xs text-slate-500">Real-time positions of field sales staff.</p>
+            <h1 className="text-lg font-semibold tracking-tight text-neutral-900">Live Map</h1>
+            <p className="text-xs text-neutral-500">Real-time positions of field sales staff.</p>
           </div>
           <Select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)}>
             <option value="">All districts</option>
@@ -501,21 +501,21 @@ export function LiveMap() {
             ))}
           </Select>
           <div className="grid grid-cols-3 gap-2 text-center">
-            <Stat label="Active" value={activeCount} tone="text-brand-600" />
-            <Stat label="No signal" value={staleCount} tone="text-slate-500" />
-            <Stat label="Offline" value={offline.length} tone="text-slate-400" />
+            <Stat label="Active" value={activeCount} tone="text-neutral-900" />
+            <Stat label="No signal" value={staleCount} tone="text-neutral-500" />
+            <Stat label="Offline" value={offline.length} tone="text-neutral-400" />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {onMap.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
-              <MapPin className="h-6 w-6 text-slate-300" />
-              <div className="text-sm font-medium text-slate-700">Nobody on duty</div>
-              <div className="text-xs text-slate-500">Salespeople appear here once they start duty in the app.</div>
+              <MapPin className="h-6 w-6 text-neutral-300" />
+              <div className="text-sm font-medium text-neutral-700">Nobody on duty</div>
+              <div className="text-xs text-neutral-500">Salespeople appear here once they start duty in the app.</div>
             </div>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-neutral-100">
               {onMap.map((e) => {
                 const isStale = e.status === "stale";
                 const isSelected = selectedEmployee === e.employeeId;
@@ -524,7 +524,7 @@ export function LiveMap() {
                     <button
                       onClick={() => focusEmployee(e)}
                       className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition ${
-                        isSelected ? "bg-brand-50" : "hover:bg-slate-50"
+                        isSelected ? "bg-neutral-100" : "hover:bg-neutral-50"
                       }`}
                     >
                       <span
@@ -534,12 +534,12 @@ export function LiveMap() {
                         {initials(e.name)}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-slate-900">{e.name}</span>
-                        <span className="block truncate text-xs text-slate-500">
+                        <span className="block truncate text-sm font-medium text-neutral-900">{e.name}</span>
+                        <span className="block truncate text-xs text-neutral-500">
                           {(e.districtId && districtNameById.get(e.districtId)) || "No district"}
                         </span>
                       </span>
-                      <span className={`shrink-0 text-[11px] ${isStale ? "text-amber-600" : "text-slate-400"}`}>
+                      <span className={`shrink-0 text-[11px] ${isStale ? "text-amber-600" : "text-neutral-400"}`}>
                         {timeAgo(e.updatedAt, now)}
                       </span>
                     </button>
@@ -550,24 +550,24 @@ export function LiveMap() {
           )}
 
           {offline.length > 0 && (
-            <div className="border-t border-slate-100">
-              <div className="flex items-center gap-1.5 px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <div className="border-t border-neutral-100">
+              <div className="flex items-center gap-1.5 px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                 <WifiOff className="h-3 w-3" />
                 Offline · not reporting for 2+ hours
               </div>
               <ul>
                 {offline.map((e) => (
                   <li key={e.employeeId} className="flex items-center gap-3 px-4 py-2 opacity-70">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-500">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-semibold text-neutral-500">
                       {initials(e.name)}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-slate-700">{e.name}</span>
-                      <span className="block truncate text-xs text-slate-400">
+                      <span className="block truncate text-sm text-neutral-700">{e.name}</span>
+                      <span className="block truncate text-xs text-neutral-400">
                         {(e.districtId && districtNameById.get(e.districtId)) || "No district"}
                       </span>
                     </span>
-                    <span className="shrink-0 text-[11px] text-slate-400">Last seen {timeAgo(e.updatedAt, now)}</span>
+                    <span className="shrink-0 text-[11px] text-neutral-400">Last seen {timeAgo(e.updatedAt, now)}</span>
                   </li>
                 ))}
               </ul>
@@ -581,9 +581,9 @@ export function LiveMap() {
 
 function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-2 py-2">
+    <div className="rounded-lg bg-neutral-50 px-2 py-2">
       <div className={`text-lg font-semibold leading-none ${tone}`}>{value}</div>
-      <div className="mt-1 text-[11px] text-slate-500">{label}</div>
+      <div className="mt-1 text-[11px] text-neutral-500">{label}</div>
     </div>
   );
 }

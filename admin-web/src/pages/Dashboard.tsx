@@ -17,10 +17,13 @@ import {
 } from "recharts";
 import { api } from "../lib/api";
 import type { District, ReportSummary } from "../lib/types";
-import { Badge, Card, CardHeader, PageHeader, StatCard } from "../components/ui/Card";
+import { Card, CardHeader, PageHeader, Segmented, StatCard, Status } from "../components/ui/Card";
 import { Select } from "../components/ui/Input";
 
-const PALETTE = ["#0277bd", "#e5007d", "#4db848", "#f5921e", "#e31e2d", "#00a6e6", "#d4b800", "#64748b"];
+// Primary series in near-black with Roalux red as the highlight; categories use the logo swatches.
+const INK = "#262626";
+const RED = "#d4202a";
+const PALETTE = ["#262626", "#d4202a", "#4db848", "#f5921e", "#00a6e6", "#e5007d", "#d4b800", "#a3a3a3"];
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
@@ -31,7 +34,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "#d97706",
-  confirmed: "#0277bd",
+  confirmed: "#0284c7",
   delivered: "#16a34a",
   cancelled: "#dc2626",
 };
@@ -79,19 +82,7 @@ export function Dashboard() {
 
   const filters = (
     <>
-      <div className="flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-        {PERIODS.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setPeriod(p.id)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              period === p.id ? "bg-brand-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
+      <Segmented value={period} onChange={setPeriod} options={PERIODS.map((p) => ({ value: p.id, label: p.label }))} />
       <div className="w-48">
         <Select value={districtId} onChange={(e) => setDistrictId(e.target.value)}>
           <option value="">All districts</option>
@@ -111,7 +102,7 @@ export function Dashboard() {
         <PageHeader title="Dashboard" actions={filters} />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-28 animate-pulse rounded-xl bg-slate-200/60" />
+            <div key={i} className="h-28 animate-pulse rounded-lg bg-neutral-200/60" />
           ))}
         </div>
       </div>
@@ -120,6 +111,13 @@ export function Dashboard() {
 
   const periodLabel = PERIODS.find((p) => p.id === period)!.label.toLowerCase();
   const districtName = districts.find((d) => d.id === districtId)?.name;
+
+  // Orders exist but every one is ₹0 when prices haven't been set; a chart of
+  // zeros reads as broken, so say why instead.
+  const hasSalesValue = summary.totalSales > 0;
+  const noValueText = summary.totalOrders
+    ? "These orders have no value yet. Set product prices so new orders carry amounts."
+    : "No sales in this period.";
 
   const gapDistricts = summary.districtActivity.filter(
     (d) => d.employeeCount > 0 && d.ordersCount === 0 && d.visitsCount === 0
@@ -143,12 +141,12 @@ export function Dashboard() {
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Orders" value={summary.totalOrders.toLocaleString("en-IN")} icon={Receipt} tone="blue" />
+        <StatCard label="Orders" value={summary.totalOrders.toLocaleString("en-IN")} icon={Receipt} hint="Cancelled orders excluded" />
         <StatCard
           label="Sales"
           value={formatCurrency(summary.totalSales)}
           icon={IndianRupee}
-          tone="green"
+          accent
           hint={
             summary.totalOrders
               ? `Avg ${formatCurrency(Math.round(summary.totalSales / summary.totalOrders))} per order`
@@ -159,10 +157,9 @@ export function Dashboard() {
           label="Shop visits"
           value={summary.totalVisits.toLocaleString("en-IN")}
           icon={Store}
-          tone="violet"
           hint={
             summary.totalVisits
-              ? `${Math.round((summary.totalOrders / summary.totalVisits) * 100)}% orders per visit`
+              ? `${(summary.totalOrders / summary.totalVisits).toFixed(1)} orders per visit`
               : undefined
           }
         />
@@ -170,39 +167,46 @@ export function Dashboard() {
           label="On duty now"
           value={summary.activeEmployees}
           icon={UserCheck}
-          tone="amber"
           hint="Live count, ignores filters"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Sales by District" />
+          <CardHeader title="Sales by district" />
           <div className="p-4">
+          {!hasSalesValue ? (
+            <EmptyState text={noValueText} />
+          ) : (
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={summary.salesByDistrict}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
               <XAxis dataKey="districtName" tick={{ fontSize: 11 }} interval={0} angle={-30} textAnchor="end" height={70} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="totalSales" fill="#0277bd" radius={[4, 4, 0, 0]} />
+              <Tooltip formatter={(value) => formatCurrency(value)} cursor={{ fill: "#f5f5f5" }} />
+              <Bar dataKey="totalSales" fill={INK} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          )}
           </div>
         </Card>
 
         <Card>
-          <CardHeader title="Orders Over Time" />
+          <CardHeader title="Sales over time" description="Daily order value, cancelled orders excluded" />
           <div className="p-4">
+          {!hasSalesValue ? (
+            <EmptyState text={noValueText} />
+          ) : (
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={summary.ordersOverTime}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
               <XAxis dataKey="day" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Line type="monotone" dataKey="total" stroke="#0277bd" strokeWidth={2} dot={false} />
+              <Tooltip formatter={(value) => formatCurrency(value)} />
+              <Line type="monotone" dataKey="total" stroke={RED} strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
+          )}
           </div>
         </Card>
       </div>
@@ -210,18 +214,18 @@ export function Dashboard() {
       {/* Top products & categories */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Top Products by Revenue" />
+          <CardHeader title="Top products by revenue" />
           <div className="p-4">
-          {summary.topProducts.length === 0 ? (
-            <EmptyState text="No product sales yet." />
+          {!hasSalesValue ? (
+            <EmptyState text={noValueText} />
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={summary.topProducts} layout="vertical" margin={{ left: 24 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={160} />
                 <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Bar dataKey="revenue" fill="#0277bd" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="revenue" fill={INK} radius={[0, 2, 2, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -229,10 +233,10 @@ export function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader title="Revenue by Category" />
+          <CardHeader title="Revenue by category" />
           <div className="p-4">
-          {summary.revenueByCategory.length === 0 ? (
-            <EmptyState text="No product sales yet." />
+          {!hasSalesValue ? (
+            <EmptyState text={noValueText} />
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
@@ -259,35 +263,35 @@ export function Dashboard() {
 
       {/* Employee performance */}
       <Card className="overflow-x-auto">
-        <CardHeader title="Employee Leaderboard" description="Ranked by sales in the selected period." />
+        <CardHeader title="Employee leaderboard" description="Ranked by sales in the selected period." />
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
             <tr>
               <th className="px-5 py-3 font-medium">#</th>
               <th className="px-5 py-3 font-medium">Employee</th>
               <th className="px-5 py-3 font-medium">Orders</th>
               <th className="px-5 py-3 font-medium">Sales</th>
               <th className="px-5 py-3 font-medium">Visits</th>
-              <th className="px-5 py-3 font-medium">Conversion</th>
+              <th className="px-5 py-3 font-medium">Orders per visit</th>
             </tr>
           </thead>
           <tbody>
             {summary.employeeLeaderboard.length === 0 && (
               <tr>
-                <td className="px-5 py-10 text-center text-sm text-slate-400" colSpan={6}>
+                <td className="px-5 py-10 text-center text-sm text-neutral-400" colSpan={6}>
                   No employee activity yet.
                 </td>
               </tr>
             )}
             {summary.employeeLeaderboard.map((emp, i) => (
-              <tr key={emp.employeeId} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70">
-                <td className="px-5 py-3 text-slate-400">{i + 1}</td>
-                <td className="px-5 py-3 font-medium text-slate-800">{emp.name}</td>
+              <tr key={emp.employeeId} className="border-b border-neutral-100 transition-colors last:border-0 hover:bg-neutral-50/70">
+                <td className="px-5 py-3 text-neutral-400">{i + 1}</td>
+                <td className="px-5 py-3 font-medium text-neutral-800">{emp.name}</td>
                 <td className="px-5 py-3">{emp.ordersCount}</td>
-                <td className="px-5 py-3">₹{emp.totalSales.toLocaleString("en-IN")}</td>
+                <td className="px-5 py-3 font-medium tabular-nums text-neutral-900">{formatCurrency(emp.totalSales)}</td>
                 <td className="px-5 py-3">{emp.visitsCount}</td>
                 <td className="px-5 py-3">
-                  {emp.conversionRate === null ? "—" : `${(emp.conversionRate * 100).toFixed(0)}%`}
+                  {emp.conversionRate === null ? "—" : emp.conversionRate.toFixed(1)}
                 </td>
               </tr>
             ))}
@@ -298,7 +302,7 @@ export function Dashboard() {
       {/* Order status & stuck orders */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Order Status Breakdown" />
+          <CardHeader title="Order status" />
           <div className="p-4">
           {summary.orderStatusBreakdown.length === 0 ? (
             <EmptyState text="No orders yet." />
@@ -318,7 +322,7 @@ export function Dashboard() {
                   }}
                 >
                   {summary.orderStatusBreakdown.map((entry) => (
-                    <Cell key={entry.status} fill={STATUS_COLOR[entry.status] ?? "#64748b"} />
+                    <Cell key={entry.status} fill={STATUS_COLOR[entry.status] ?? "#737373"} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -330,9 +334,9 @@ export function Dashboard() {
         </Card>
 
         <Card className="overflow-x-auto">
-          <CardHeader title="Pending Orders Needing Attention" description="Oldest first. Red means waiting over 2 days." />
+          <CardHeader title="Pending orders" description="Oldest first. Red means waiting more than 2 days." />
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-neutral-200 bg-neutral-50 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               <tr>
                 <th className="px-5 py-3 font-medium">Customer</th>
                 <th className="px-5 py-3 font-medium">Employee</th>
@@ -343,21 +347,21 @@ export function Dashboard() {
             <tbody>
               {summary.stuckPendingOrders.length === 0 && (
                 <tr>
-                  <td className="px-5 py-10 text-center text-sm text-slate-400" colSpan={4}>
+                  <td className="px-5 py-10 text-center text-sm text-neutral-400" colSpan={4}>
                     No pending orders.
                   </td>
                 </tr>
               )}
               {summary.stuckPendingOrders.map((o) => (
-                <tr key={o.id} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70">
-                  <td className="px-5 py-3 font-medium text-slate-800">
+                <tr key={o.id} className="border-b border-neutral-100 transition-colors last:border-0 hover:bg-neutral-50/70">
+                  <td className="px-5 py-3 font-medium text-neutral-800">
                     {o.customerName}
-                    {o.shopName ? <span className="text-slate-400"> · {o.shopName}</span> : null}
+                    {o.shopName ? <span className="text-neutral-400"> · {o.shopName}</span> : null}
                   </td>
                   <td className="px-5 py-3">{o.employeeName}</td>
-                  <td className="px-5 py-3">₹{o.totalAmount.toLocaleString("en-IN")}</td>
+                  <td className="px-5 py-3 tabular-nums">{formatCurrency(o.totalAmount)}</td>
                   <td className="px-5 py-3">
-                    <Badge tone={o.isStuck ? "red" : "yellow"}>{ageLabel(o.createdAt)}</Badge>
+                    <Status tone={o.isStuck ? "red" : "amber"}>{ageLabel(o.createdAt)}</Status>
                   </td>
                 </tr>
               ))}
@@ -369,7 +373,7 @@ export function Dashboard() {
       {/* District coverage */}
       <Card className="overflow-x-auto">
         <CardHeader
-          title="District Coverage"
+          title="District coverage"
           description={
             <>
               {uncoveredDistricts.length} of {summary.districtActivity.length} districts have no assigned employee ·{" "}
@@ -378,7 +382,7 @@ export function Dashboard() {
           }
         />
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
             <tr>
               <th className="px-5 py-3 font-medium">District</th>
               <th className="px-5 py-3 font-medium">Employees</th>
@@ -390,14 +394,14 @@ export function Dashboard() {
           <tbody>
             {mostActiveDistricts.length === 0 && (
               <tr>
-                <td className="px-5 py-10 text-center text-sm text-slate-400" colSpan={5}>
+                <td className="px-5 py-10 text-center text-sm text-neutral-400" colSpan={5}>
                   No district activity yet.
                 </td>
               </tr>
             )}
             {mostActiveDistricts.map((d) => (
-              <tr key={d.districtId} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70">
-                <td className="px-5 py-3 font-medium text-slate-800">{d.districtName}</td>
+              <tr key={d.districtId} className="border-b border-neutral-100 transition-colors last:border-0 hover:bg-neutral-50/70">
+                <td className="px-5 py-3 font-medium text-neutral-800">{d.districtName}</td>
                 <td className="px-5 py-3">{d.employeeCount}</td>
                 <td className="px-5 py-3">{d.onDutyCount}</td>
                 <td className="px-5 py-3">{d.ordersCount}</td>
@@ -408,8 +412,8 @@ export function Dashboard() {
         </table>
 
         {gapDistricts.length > 0 && (
-          <div className="border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-            <span className="font-medium text-slate-700">Coverage gaps: </span>
+          <div className="border-t border-neutral-200 px-4 py-3 text-xs text-neutral-500">
+            <span className="font-medium text-neutral-700">Coverage gaps: </span>
             {gapDistricts.map((d) => d.districtName).join(", ")} — have an assigned employee but no orders or visits
             in this period.
           </div>
@@ -429,7 +433,9 @@ function formatCurrency(value: unknown): string {
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div className="flex h-[240px] items-center justify-center text-sm text-slate-400">{text}</div>;
+  return (
+    <div className="flex h-[240px] items-center justify-center px-8 text-center text-sm text-neutral-500">{text}</div>
+  );
 }
 
 function ageLabel(createdAt: string): string {

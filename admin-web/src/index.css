@@ -1,19 +1,22 @@
 @import "tailwindcss";
 
-/* Roalux brand. `brand` is the interactive colour (buttons, links, active
-   states); `paint-*` are the six swatches from the logo, used for accents and
-   charts only; `ink` is the dark chrome behind the sidebar and login panel. */
+/* Roalux admin. Neutral greys (no blue cast) carry the UI; `brand` is the
+   Roalux red, used sparingly for the active nav marker, key figures and the
+   primary chart series; `paint-*` are the six logo swatches, for charts and
+   the logo stripe only. */
 @theme {
-  --color-brand-50: #eef7fd;
-  --color-brand-100: #d6ecfa;
-  --color-brand-200: #add8f3;
-  --color-brand-300: #74bde9;
-  --color-brand-400: #3a9fdb;
-  --color-brand-500: #0e88cf;
-  --color-brand-600: #0277bd;
-  --color-brand-700: #065f98;
-  --color-brand-800: #0b4f7d;
-  --color-brand-900: #0f4268;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-brand-50: #fef2f2;
+  --color-brand-100: #fde3e3;
+  --color-brand-200: #fbcaca;
+  --color-brand-300: #f6a3a3;
+  --color-brand-400: #ee6b6b;
+  --color-brand-500: #e33a3a;
+  --color-brand-600: #d4202a;
+  --color-brand-700: #b2171f;
+  --color-brand-800: #93171d;
+  --color-brand-900: #7a191e;
 
   --color-paint-magenta: #e5007d;
   --color-paint-green: #4db848;
@@ -21,10 +24,6 @@
   --color-paint-red: #e31e2d;
   --color-paint-blue: #00a6e6;
   --color-paint-yellow: #ffe500;
-
-  --color-ink-800: #1b2335;
-  --color-ink-900: #121a2b;
-  --color-ink-950: #0b111e;
 }
 
 :root {
@@ -32,7 +31,8 @@
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-neutral-50 text-neutral-900 antialiased;
+  font-feature-settings: "cv11", "ss01";
 }
 
 /* The six logo swatches as one thin band. */

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   BarChart3,
+  Clock,
   LogOut,
   MapPinned,
   Menu,
@@ -16,7 +17,7 @@ import { useAuth } from "../context/AuthContext";
 
 const navGroups: { label: string; items: { to: string; label: string; icon: LucideIcon; end?: boolean }[] }[] = [
   {
-    label: "Monitor",
+    label: "Overview",
     items: [
       { to: "/", label: "Live Map", icon: MapPinned, end: true },
       { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
@@ -26,14 +27,15 @@ const navGroups: { label: string; items: { to: string; label: string; icon: Luci
     label: "Sales",
     items: [
       { to: "/orders", label: "Orders", icon: Receipt },
-      { to: "/visits", label: "Visits", icon: Store },
+      { to: "/visits", label: "Shop Visits", icon: Store },
+      { to: "/products", label: "Products & Prices", icon: Package },
     ],
   },
   {
-    label: "Manage",
+    label: "Team",
     items: [
       { to: "/employees", label: "Employees", icon: Users },
-      { to: "/products", label: "Products", icon: Package },
+      { to: "/attendance", label: "Attendance", icon: Clock },
     ],
   },
 ];
@@ -52,20 +54,25 @@ export function Layout() {
     .toUpperCase();
 
   const sidebar = (
-    <div className="flex h-full flex-col bg-ink-950 text-slate-300">
-      <div className="paint-stripe h-1 shrink-0" />
-      <div className="px-5 pb-5 pt-6">
-        <img src="/roalux-logo.png" alt="Roalux" className="h-11 w-auto" />
-        <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Sales admin</div>
+    <div className="flex h-full flex-col border-r border-neutral-200 bg-white">
+      <div className="paint-stripe h-[3px] shrink-0" />
+      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-neutral-200 px-5">
+        <img src="/roalux-logo.png" alt="Roalux" className="h-8 w-auto" />
+        <div className="h-6 w-px bg-neutral-200" />
+        <div className="text-[13px] font-semibold leading-tight text-neutral-800">
+          Sales
+          <br />
+          <span className="font-normal text-neutral-500">Console</span>
+        </div>
       </div>
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-2">
+      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {navGroups.map((group) => (
           <div key={group.label}>
-            <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
               {group.label}
             </div>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {group.items.map(({ to, label, icon: Icon, end }) => (
                 <NavLink
                   key={to}
@@ -73,15 +80,19 @@ export function Layout() {
                   end={end}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
-                    `relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    `relative flex h-9 items-center gap-3 rounded-md px-3 text-[13.5px] transition-colors ${
                       isActive
-                        ? "bg-white/10 text-white before:absolute before:inset-y-1.5 before:-left-3 before:w-1 before:rounded-r-full before:bg-brand-400"
-                        : "text-slate-400 hover:bg-white/5 hover:text-white"
+                        ? "bg-neutral-100 font-semibold text-neutral-900 before:absolute before:inset-y-2 before:-left-3 before:w-[3px] before:rounded-r before:bg-brand-600"
+                        : "font-medium text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
                     }`
                   }
                 >
-                  <Icon className="h-4 w-4" />
-                  {label}
+                  {({ isActive }) => (
+                    <>
+                      <Icon className={`h-[17px] w-[17px] ${isActive ? "text-neutral-900" : "text-neutral-400"}`} />
+                      {label}
+                    </>
+                  )}
                 </NavLink>
               ))}
             </div>
@@ -89,19 +100,20 @@ export function Layout() {
         ))}
       </nav>
 
-      <div className="border-t border-white/10 p-3">
-        <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
+      <div className="border-t border-neutral-200 p-3">
+        <div className="flex items-center gap-3 rounded-md px-2 py-1.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-xs font-semibold text-white">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-white">{user?.name}</div>
-            <div className="text-xs text-slate-500">Administrator</div>
+            <div className="truncate text-[13px] font-semibold text-neutral-900">{user?.name}</div>
+            <div className="text-xs text-neutral-500">Administrator</div>
           </div>
           <button
             onClick={logout}
             title="Log out"
-            className="rounded-md p-2 text-slate-500 hover:bg-white/10 hover:text-white"
+            aria-label="Log out"
+            className="rounded-md p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
           >
             <LogOut className="h-4 w-4" />
           </button>
@@ -111,19 +123,23 @@ export function Layout() {
   );
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-neutral-50">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 lg:block">{sidebar}</aside>
 
       {open ? (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-stone-900/40" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-64 shadow-2xl">{sidebar}</div>
+          <div className="absolute inset-0 bg-neutral-900/30" onClick={() => setOpen(false)} />
+          <div className="absolute inset-y-0 left-0 w-64 shadow-xl">{sidebar}</div>
         </div>
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
-          <button onClick={() => setOpen((o) => !o)} className="rounded-md p-2 text-slate-600 hover:bg-slate-100">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-neutral-200 bg-white px-4 lg:hidden">
+          <button
+            onClick={() => setOpen((o) => !o)}
+            aria-label="Menu"
+            className="rounded-md p-2 text-neutral-600 hover:bg-neutral-100"
+          >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <img src="/roalux-logo.png" alt="Roalux" className="h-7 w-auto" />
@@ -134,8 +150,8 @@ export function Layout() {
             <Outlet />
           </main>
         ) : (
-          <main className="flex-1 p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-7xl">
+          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <div className="mx-auto max-w-[1400px]">
               <Outlet />
             </div>
           </main>

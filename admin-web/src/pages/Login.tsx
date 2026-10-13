@@ -53,52 +53,49 @@ export function Login() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden overflow-hidden bg-ink-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="paint-stripe absolute inset-x-0 top-0 h-1.5" />
-        <div className="absolute -right-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-paint-magenta/15 blur-3xl" />
-        <div className="absolute -bottom-40 -left-24 h-[28rem] w-[28rem] rounded-full bg-paint-blue/15 blur-3xl" />
-        <div className="relative">
-          <img src="/roalux-logo.png" alt="Roalux" className="h-16 w-auto" />
+      <div className="relative hidden bg-neutral-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="paint-stripe absolute inset-x-0 top-0 h-1" />
+        <div>
+          <img src="/roalux-logo.png" alt="Roalux" className="h-14 w-auto" />
+          <div className="mt-4 text-[13px] font-medium uppercase tracking-[0.2em] text-neutral-500">Sales Console</div>
         </div>
-        <div className="relative space-y-8">
-          <h1 className="max-w-md text-4xl font-semibold leading-tight tracking-tight">
+        <div className="space-y-10">
+          <h1 className="max-w-md text-[34px] font-semibold leading-tight tracking-tight">
             Your field sales team, on one screen.
           </h1>
-          <ul className="space-y-5">
+          <ul className="max-w-md divide-y divide-white/10 border-y border-white/10">
             {highlights.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="flex gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/10">
-                  <Icon className="h-5 w-5 text-brand-300" />
-                </div>
+              <li key={title} className="flex gap-4 py-4">
+                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brand-500" />
                 <div>
                   <div className="font-medium">{title}</div>
-                  <div className="text-sm text-slate-400">{text}</div>
+                  <div className="mt-0.5 text-sm text-neutral-400">{text}</div>
                 </div>
               </li>
             ))}
           </ul>
         </div>
-        <div className="relative text-xs text-slate-500">Admin access only</div>
+        <div className="text-xs text-neutral-500">Admin access only</div>
       </div>
 
-      <div className="flex items-center justify-center bg-slate-50 px-4 py-12">
+      <div className="flex items-center justify-center bg-white px-4 py-12">
         <div className="w-full max-w-sm">
           <img src="/roalux-logo.png" alt="Roalux" className="mb-10 h-12 w-auto lg:hidden" />
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Sign in</h2>
-          <p className="mt-1 text-sm text-slate-500">Use your admin mobile number and password.</p>
+          <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Sign in</h2>
+          <p className="mt-1 text-sm text-neutral-500">Use your admin mobile number and password.</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
               <div className="mb-1 flex items-baseline justify-between">
                 <Label>Mobile number</Label>
                 <span
-                  className={`text-xs font-semibold tabular-nums ${phoneComplete ? "text-emerald-600" : "text-slate-400"}`}
+                  className={`text-xs font-semibold tabular-nums ${phoneComplete ? "text-emerald-600" : "text-neutral-400"}`}
                 >
                   {phone.length}/{PHONE_LENGTH}
                 </span>
               </div>
-              <div className="flex overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20">
-                <span className="flex items-center border-r border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+              <div className="flex h-10 overflow-hidden rounded-md border border-neutral-300 bg-white transition focus-within:border-neutral-900 focus-within:ring-2 focus-within:ring-neutral-900/10">
+                <span className="flex items-center border-r border-neutral-200 bg-neutral-50 px-3 text-sm font-semibold text-neutral-700">
                   +91
                 </span>
                 <input
@@ -111,7 +108,7 @@ export function Login() {
                   autoComplete="username"
                   autoFocus
                   required
-                  className="w-full px-3 py-2 text-sm tracking-wider outline-none placeholder:text-slate-400"
+                  className="w-full px-3 py-2 text-sm tracking-wider outline-none placeholder:text-neutral-400"
                 />
                 {phoneComplete ? <CheckCircle2 className="mr-3 h-4 w-4 shrink-0 self-center text-emerald-600" /> : null}
               </div>
@@ -127,12 +124,12 @@ export function Login() {
               />
             </div>
             {error && (
-              <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 {error}
               </div>
             )}
-            <Button type="submit" className="w-full py-2.5" disabled={submitting || !phoneComplete || !password}>
+            <Button type="submit" className="h-10 w-full" disabled={submitting || !phoneComplete || !password}>
               {submitting ? "Signing in…" : "Sign in"}
             </Button>
           </form>

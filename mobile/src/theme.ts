@@ -3,8 +3,9 @@ export const colors = {
   primary: "#0277bd",
   primaryDark: "#065f98",
   primarySoft: "#eef7fd",
-  ink: "#0b111e",
-  inkSoft: "#1b2335",
+  // Neutral near-black for dark surfaces (no blue cast).
+  ink: "#171717",
+  inkSoft: "#262626",
   success: "#15803d",
   successSoft: "#ecfdf5",
   warning: "#b45309",

@@ -1,92 +1,66 @@
 import type { ComponentType, ReactNode } from "react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`rounded-lg border border-neutral-200 bg-white ${className}`}>{children}</div>;
 }
 
 export function CardHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-5 py-3.5">
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-        {description ? <p className="mt-0.5 text-xs text-slate-500">{description}</p> : null}
+        <h2 className="text-[15px] font-semibold text-neutral-900">{title}</h2>
+        {description ? <p className="mt-0.5 text-[13px] text-neutral-500">{description}</p> : null}
       </div>
       {actions}
     </div>
   );
 }
 
-type Tone = "blue" | "green" | "amber" | "violet" | "slate";
-
-const statTones: Record<Tone, string> = {
-  blue: "bg-brand-50 text-brand-600",
-  green: "bg-emerald-50 text-emerald-600",
-  amber: "bg-amber-50 text-amber-600",
-  violet: "bg-violet-50 text-violet-600",
-  slate: "bg-slate-100 text-slate-600",
-};
-
 export function StatCard({
   label,
   value,
   icon: Icon,
-  tone = "slate",
   hint,
+  accent = false,
 }: {
   label: string;
   value: ReactNode;
   icon?: ComponentType<{ className?: string }>;
-  tone?: Tone;
   hint?: ReactNode;
+  // The one figure on a page that matters most gets the Roalux red rule.
+  accent?: boolean;
+  tone?: string;
 }) {
   return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-slate-500">{label}</div>
-          <div className="mt-2 truncate text-2xl font-semibold tracking-tight text-slate-900">{value}</div>
-          {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
-        </div>
-        {Icon ? (
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${statTones[tone]}`}>
-            <Icon className="h-5 w-5" />
-          </div>
-        ) : null}
+    <Card className={`relative overflow-hidden px-5 py-4 ${accent ? "border-t-2 border-t-brand-600" : ""}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[13px] font-medium text-neutral-500">{label}</div>
+        {Icon ? <Icon className="h-4 w-4 text-neutral-400" /> : null}
       </div>
+      <div className="mt-2 truncate text-[26px] font-semibold leading-none tracking-tight text-neutral-900 tabular-nums">
+        {value}
+      </div>
+      {hint ? <div className="mt-2 text-xs text-neutral-500">{hint}</div> : null}
     </Card>
   );
 }
 
-export function Badge({
-  children,
-  tone = "slate",
-}: {
-  children: ReactNode;
-  tone?: "slate" | "green" | "yellow" | "red" | "blue";
-}) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-700 ring-slate-200",
-    green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    yellow: "bg-amber-50 text-amber-700 ring-amber-200",
-    red: "bg-red-50 text-red-700 ring-red-200",
-    blue: "bg-brand-50 text-brand-700 ring-brand-200",
-  };
-  const dots: Record<string, string> = {
-    slate: "bg-slate-400",
-    green: "bg-emerald-500",
-    yellow: "bg-amber-500",
-    red: "bg-red-500",
-    blue: "bg-brand-500",
-  };
+export type StatusTone = "neutral" | "green" | "amber" | "red" | "blue";
+
+const markerColor: Record<StatusTone, string> = {
+  neutral: "bg-neutral-400",
+  green: "bg-emerald-600",
+  amber: "bg-amber-500",
+  red: "bg-red-600",
+  blue: "bg-sky-600",
+};
+
+// Status as plain text with a small square marker, so tables read like a
+// report rather than a row of coloured pills.
+export function Status({ tone = "neutral", children }: { tone?: StatusTone; children: ReactNode }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium capitalize ring-1 ring-inset ${tones[tone]}`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${dots[tone]}`} />
+    <span className="inline-flex items-center gap-2 whitespace-nowrap text-[13px] font-medium text-neutral-800">
+      <span className={`h-2 w-2 shrink-0 rounded-[2px] ${markerColor[tone]}`} />
       {children}
     </span>
   );
@@ -102,12 +76,83 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="flex flex-wrap items-end justify-between gap-4 border-b border-neutral-200 pb-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
-        {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
+        <h1 className="text-[22px] font-semibold tracking-tight text-neutral-900">{title}</h1>
+        {description ? <p className="mt-1 text-sm text-neutral-500">{description}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+    </div>
+  );
+}
+
+export function Notice({ tone, children }: { tone: "ok" | "error" | "warn"; children: ReactNode }) {
+  const styles = {
+    ok: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    error: "border-red-200 bg-red-50 text-red-800",
+    warn: "border-amber-200 bg-amber-50 text-amber-900",
+  }[tone];
+  return <div className={`rounded-md border px-4 py-2.5 text-sm ${styles}`}>{children}</div>;
+}
+
+// Underlined tabs for filtering a list (status, period). Counts are optional.
+export function Tabs<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string; count?: number }[];
+}) {
+  return (
+    <div className="flex gap-1 overflow-x-auto border-b border-neutral-200">
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            onClick={() => onChange(o.value)}
+            className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              active
+                ? "border-neutral-900 text-neutral-900"
+                : "border-transparent text-neutral-500 hover:text-neutral-800"
+            }`}
+          >
+            {o.label}
+            {o.count !== undefined ? (
+              <span className={`text-xs tabular-nums ${active ? "text-neutral-900" : "text-neutral-400"}`}>{o.count}</span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Joined buttons for a small fixed choice, such as a date range.
+export function Segmented<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="inline-flex overflow-hidden rounded-md border border-neutral-300 bg-white">
+      {options.map((o, i) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`h-9 px-3 text-[13px] font-medium transition-colors ${i > 0 ? "border-l border-neutral-300" : ""} ${
+            o.value === value ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-50"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }

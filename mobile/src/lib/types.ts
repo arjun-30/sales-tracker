@@ -11,6 +11,7 @@ export interface User {
   id: string;
   name: string;
   phone: string;
+  employeeCode?: string | null;
   role: Role;
   districtId: string | null;
   district?: District | null;

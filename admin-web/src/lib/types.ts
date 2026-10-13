@@ -11,6 +11,7 @@ export interface AuthUser {
   id: string;
   name: string;
   phone: string;
+  employeeCode?: string | null;
   role: Role;
   districtId: string | null;
 }
@@ -19,6 +20,8 @@ export interface Employee {
   id: string;
   name: string;
   phone: string;
+  employeeCode: string | null;
+  minutesToday: number;
   active: boolean;
   districtId: string | null;
   district: District | null;
@@ -134,4 +137,33 @@ export interface ReportSummary {
     ordersCount: number;
     visitsCount: number;
   }[];
+}
+
+export interface WorkedDay {
+  date: string;
+  minutes: number;
+  firstOn: string;
+  lastOff: string | null;
+}
+
+export interface DutySession {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  endReason: "manual" | "timeout" | "deactivated" | null;
+  minutes: number;
+}
+
+export interface AttendanceReport {
+  employee: Omit<Employee, "employeeLocation" | "minutesToday"> & {
+    employeeLocation: { onDuty: boolean; updatedAt: string } | null;
+  };
+  from: string;
+  to: string;
+  totalMinutes: number;
+  daysWorked: number;
+  averageMinutesPerDay: number;
+  days: WorkedDay[];
+  sessions: DutySession[];
+  activity: { orders: number; sales: number; visits: number };
 }
