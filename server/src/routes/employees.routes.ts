@@ -28,7 +28,7 @@ employeesRouter.get("/", async (_req, res) => {
 
 const createSchema = z.object({
   name: z.string().min(1),
-  phone: z.string().min(4),
+  phone: z.string().regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
   password: z.string().min(4),
   districtId: z.string().min(1),
 });

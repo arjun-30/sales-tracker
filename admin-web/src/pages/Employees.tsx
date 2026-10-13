@@ -95,7 +95,16 @@ export function Employees() {
             </div>
             <div>
               <Label>Phone</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} required />
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                inputMode="numeric"
+                pattern="\d{10}"
+                maxLength={10}
+                placeholder="10-digit mobile number"
+                title="Exactly 10 digits"
+                required
+              />
             </div>
             <div>
               <Label>Temp password</Label>

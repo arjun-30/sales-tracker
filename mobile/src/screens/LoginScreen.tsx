@@ -1,33 +1,50 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useAuth } from "../context/AuthContext";
-import { Button, Field, PaintStripe } from "../components/ui";
+import { PaintStripe } from "../components/ui";
 import { colors, radius } from "../theme";
+
+const PHONE_LENGTH = 10;
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const passwordRef = useRef<TextInput>(null);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [focused, setFocused] = useState<"phone" | "password" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const phoneComplete = phone.length === PHONE_LENGTH;
+  const canSubmit = phoneComplete && password.length > 0 && !submitting;
+
+  function handlePhoneChange(text: string) {
+    // Digits only, capped at 10: pasted "+91 98765 43210" keeps its last 10 digits.
+    const digits = text.replace(/\D/g, "");
+    setPhone(digits.length > PHONE_LENGTH ? digits.slice(-PHONE_LENGTH) : digits);
+    if (error) setError(null);
+  }
+
   async function handleSubmit() {
+    if (!canSubmit) return;
     setError(null);
     setSubmitting(true);
     try {
-      await login(phone.trim(), password);
+      await login(phone, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -36,96 +53,163 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-          <View style={styles.hero}>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <View style={styles.brand}>
             <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
-            <Text style={styles.title}>Sales</Text>
-            <Text style={styles.subtitle}>Sign in to start your day</Text>
+            <Text style={styles.brandTag}>Sales app</Text>
           </View>
-          <PaintStripe height={5} />
 
-          <View style={styles.container}>
-            <View style={styles.form}>
-              <Field
-                label="Phone number"
-                icon="call-outline"
-                placeholder="10-digit mobile number"
-                keyboardType="phone-pad"
-                autoCapitalize="none"
-                value={phone}
-                onChangeText={setPhone}
-                maxLength={15}
-              />
-              <View>
-                <Field
-                  label="Password"
-                  icon="lock-closed-outline"
+          <View>
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>Log in with your registered mobile number.</Text>
+          </View>
+
+          <View style={styles.form}>
+            <View style={{ gap: 8 }}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Mobile number</Text>
+                <Text style={[styles.counter, phoneComplete && { color: colors.success }]}>
+                  {phone.length}/{PHONE_LENGTH}
+                </Text>
+              </View>
+              <View style={[styles.inputRow, focused === "phone" && styles.inputFocused]}>
+                <View style={styles.prefix}>
+                  <Text style={styles.prefixText}>+91</Text>
+                </View>
+                <TextInput
+                  style={[styles.input, styles.phoneInput]}
+                  value={phone}
+                  onChangeText={handlePhoneChange}
+                  placeholder="98765 43210"
+                  placeholderTextColor={colors.textFaint}
+                  keyboardType="number-pad"
+                  maxLength={PHONE_LENGTH}
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
+                  returnKeyType="next"
+                  onFocus={() => setFocused("phone")}
+                  onBlur={() => setFocused(null)}
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                />
+                {phoneComplete ? <Ionicons name="checkmark-circle" size={22} color={colors.success} /> : null}
+              </View>
+              {phone.length > 0 && !phoneComplete && focused !== "phone" ? (
+                <Text style={styles.hint}>Enter all 10 digits of your mobile number.</Text>
+              ) : null}
+            </View>
+
+            <View style={{ gap: 8 }}>
+              <Text style={styles.label}>Password</Text>
+              <View style={[styles.inputRow, focused === "password" && styles.inputFocused]}>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.textFaint} style={{ marginLeft: 14 }} />
+                <TextInput
+                  ref={passwordRef}
+                  style={styles.input}
+                  value={password}
+                  onChangeText={(t) => {
+                    setPassword(t);
+                    if (error) setError(null);
+                  }}
                   placeholder="Your password"
+                  placeholderTextColor={colors.textFaint}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
-                  value={password}
-                  onChangeText={setPassword}
+                  autoComplete="password"
+                  returnKeyType="go"
+                  onFocus={() => setFocused("password")}
+                  onBlur={() => setFocused(null)}
                   onSubmitEditing={handleSubmit}
-                  style={{ paddingRight: 32 }}
                 />
                 <TouchableOpacity
                   style={styles.eye}
                   onPress={() => setShowPassword((s) => !s)}
                   accessibilityLabel={showPassword ? "Hide password" : "Show password"}
                 >
-                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textMuted} />
+                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
-
-              {error ? (
-                <View style={styles.error}>
-                  <Ionicons name="alert-circle" size={18} color={colors.danger} />
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              ) : null}
-
-              <Button
-                label="Log in"
-                icon="log-in-outline"
-                onPress={handleSubmit}
-                loading={submitting}
-                disabled={!phone || !password}
-              />
             </View>
 
-            <Text style={styles.footer}>Trouble signing in? Contact your manager.</Text>
+            {error ? (
+              <View style={styles.error}>
+                <Ionicons name="alert-circle" size={18} color={colors.danger} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.submit, !canSubmit && styles.submitDisabled]}
+              onPress={handleSubmit}
+              disabled={!canSubmit}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.submitText}>Log in</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.help}>
+            <Ionicons name="help-circle-outline" size={16} color={colors.textFaint} />
+            <Text style={styles.helpText}>Forgot your password? Ask your manager to reset it.</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <PaintStripe height={6} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.ink },
-  hero: { backgroundColor: colors.ink, alignItems: "center", paddingTop: 48, paddingBottom: 36, paddingHorizontal: 24 },
-  logo: { width: 220, height: 77 },
-  title: {
-    fontSize: 13,
+  safe: { flex: 1, backgroundColor: colors.surface },
+  container: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 32, gap: 28 },
+  brand: { alignItems: "center", gap: 6 },
+  logo: { width: 210, height: 73 },
+  brandTag: {
+    fontSize: 12,
     fontWeight: "800",
-    color: "#94a3b8",
-    letterSpacing: 4,
+    color: colors.textFaint,
+    letterSpacing: 3,
     textTransform: "uppercase",
-    marginTop: 14,
   },
-  subtitle: { fontSize: 16, color: "#e2e8f0", marginTop: 6, fontWeight: "500" },
-  container: { flexGrow: 1, backgroundColor: colors.background, padding: 24, gap: 24 },
-  form: {
-    gap: 16,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 20,
+  title: { fontSize: 28, fontWeight: "800", color: colors.text },
+  subtitle: { fontSize: 15, color: colors.textMuted, marginTop: 4 },
+  form: { gap: 18 },
+  labelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
+  label: { fontSize: 14, fontWeight: "700", color: colors.text },
+  counter: { fontSize: 13, fontWeight: "700", color: colors.textFaint, fontVariant: ["tabular-nums"] },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 56,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+    paddingRight: 12,
+    overflow: "hidden",
   },
-  eye: { position: "absolute", right: 12, bottom: 12, padding: 4 },
+  inputFocused: { borderColor: colors.primary, backgroundColor: colors.surface },
+  prefix: {
+    alignSelf: "stretch",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+    marginRight: 2,
+  },
+  prefixText: { fontSize: 17, fontWeight: "700", color: colors.text },
+  input: { flex: 1, fontSize: 17, color: colors.text, paddingHorizontal: 12, paddingVertical: 14 },
+  phoneInput: { letterSpacing: 1.5, fontWeight: "600" },
+  hint: { fontSize: 13, color: colors.warning, fontWeight: "500" },
+  eye: { padding: 6 },
   error: {
     flexDirection: "row",
     alignItems: "center",
@@ -135,5 +219,18 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   errorText: { color: colors.danger, flex: 1, fontSize: 14, fontWeight: "500" },
-  footer: { textAlign: "center", color: colors.textFaint, fontSize: 13 },
+  submit: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    minHeight: 56,
+    borderRadius: radius.md,
+    backgroundColor: colors.ink,
+    marginTop: 4,
+  },
+  submitDisabled: { backgroundColor: colors.textFaint },
+  submitText: { color: "#fff", fontSize: 17, fontWeight: "800" },
+  help: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  helpText: { color: colors.textFaint, fontSize: 13 },
 });

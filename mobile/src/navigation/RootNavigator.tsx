@@ -83,8 +83,8 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer theme={navTheme}>
-      {/* The only StatusBar in the app: light over the dark login hero, dark everywhere else. */}
-      <StatusBar style={user ? "dark" : "light"} />
+      {/* The only StatusBar in the app; every screen has a light background. */}
+      <StatusBar style="dark" />
       {user ? (
         <DutyProvider>
           <Stack.Navigator screenOptions={headerStyle}>

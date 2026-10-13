@@ -46,6 +46,16 @@ describe("products and employees", () => {
     expect(res.status).toBe(409);
   });
 
+  it("creating an employee requires a 10-digit phone number", async () => {
+    for (const phone of ["900000001", "90000000011", "90000-0001", "+919000000011"]) {
+      const res = await api()
+        .post("/api/employees")
+        .set(bearer(admin))
+        .send({ name: "Bad Phone", phone, password: "abcd", districtId: f.chennai.id });
+      expect(res.status, phone).toBe(400);
+    }
+  });
+
   it("FR-EMP-03 admin resets an employee's password; only the new one works", async () => {
     const res = await api()
       .post(`/api/employees/${f.empA.id}/password`)
