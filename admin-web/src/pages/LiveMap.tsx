@@ -72,7 +72,7 @@ const STALE_AFTER_MS = 10 * 60 * 1000;
 // as offline instead.
 const OFFLINE_AFTER_MS = 2 * 60 * 60 * 1000;
 
-const COLOR_ACTIVE = "#171717";
+const COLOR_ACTIVE = "#6d4bb3";
 const COLOR_STALE = "#a3a3a3";
 
 type Status = "active" | "stale" | "offline";
@@ -242,7 +242,7 @@ export function LiveMap() {
       return {
         fillColor: COLOR_ACTIVE,
         fillOpacity: isSelected ? 0.08 : isHovered ? 0.06 : 0,
-        strokeColor: isSelected ? "#d4202a" : isHovered ? "#404040" : "#737373",
+        strokeColor: isSelected ? "#6d4bb3" : isHovered ? "#4a3559" : "#737373",
         strokeWeight: isSelected ? 2.5 : isHovered ? 1.5 : 0.7,
         strokeOpacity: isSelected ? 1 : isHovered ? 0.9 : 0.45,
         zIndex: isSelected ? 4 : isHovered ? 3 : 2,
@@ -417,7 +417,7 @@ export function LiveMap() {
                     scale: isSelected ? 15 : 13,
                     fillColor: isStale ? COLOR_STALE : COLOR_ACTIVE,
                     fillOpacity: 1,
-                    strokeColor: isSelected ? "#d4202a" : "#ffffff",
+                    strokeColor: isSelected ? "#2e1f3a" : "#ffffff",
                     strokeWeight: isSelected ? 3 : 2.5,
                   }}
                 >
@@ -501,7 +501,7 @@ export function LiveMap() {
             ))}
           </Select>
           <div className="grid grid-cols-3 gap-2 text-center">
-            <Stat label="Active" value={activeCount} tone="text-neutral-900" />
+            <Stat label="Active" value={activeCount} tone="text-brand-600" />
             <Stat label="No signal" value={staleCount} tone="text-neutral-500" />
             <Stat label="Offline" value={offline.length} tone="text-neutral-400" />
           </div>
@@ -524,7 +524,7 @@ export function LiveMap() {
                     <button
                       onClick={() => focusEmployee(e)}
                       className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition ${
-                        isSelected ? "bg-neutral-100" : "hover:bg-neutral-50"
+                        isSelected ? "bg-brand-50" : "hover:bg-neutral-50"
                       }`}
                     >
                       <span

@@ -1,12 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs><clipPath id="c"><rect width="64" height="64" rx="14"/></clipPath></defs>
-  <g clip-path="url(#c)">
-    <rect x="0" width="11" height="64" fill="#e5007d"/>
-    <rect x="10.6" width="11" height="64" fill="#4db848"/>
-    <rect x="21.3" width="11" height="64" fill="#f5921e"/>
-    <rect x="32" width="11" height="64" fill="#e31e2d"/>
-    <rect x="42.6" width="11" height="64" fill="#00a6e6"/>
-    <rect x="53.3" width="11" height="64" fill="#ffe500"/>
-  </g>
-  <text x="32" y="46" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="40" fill="#fff" stroke="#171717" stroke-opacity=".25" stroke-width="1.5">R</text>
+  <rect width="64" height="64" rx="14" fill="#2e1f3a"/>
+  <text x="32" y="45" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="36" fill="#ffffff">R</text>
+  <rect x="20" y="50" width="24" height="4" rx="2" fill="#b9a3e1"/>
 </svg>

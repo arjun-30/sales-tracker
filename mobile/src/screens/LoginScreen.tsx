@@ -14,7 +14,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useAuth } from "../context/AuthContext";
-import { PaintStripe } from "../components/ui";
 import { colors, radius } from "../theme";
 
 const PHONE_LENGTH = 10;
@@ -169,7 +168,6 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <PaintStripe height={6} />
     </SafeAreaView>
   );
 }
@@ -233,7 +231,7 @@ const styles = StyleSheet.create({
     gap: 10,
     minHeight: 56,
     borderRadius: radius.md,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.primary,
     marginTop: 4,
   },
   submitDisabled: { backgroundColor: colors.textFaint },

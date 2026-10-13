@@ -11,20 +11,9 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
-import { colors, paint, radius, statusTone } from "../theme";
+import { colors, radius, statusTone } from "../theme";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
-
-// The logo swatches as a thin band, the app's brand signature.
-export function PaintStripe({ height = 4, style }: { height?: number; style?: StyleProp<ViewStyle> }) {
-  return (
-    <View style={[{ flexDirection: "row", height }, style]}>
-      {paint.map((c) => (
-        <View key={c} style={{ flex: 1, backgroundColor: c }} />
-      ))}
-    </View>
-  );
-}
 
 export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.card, style]}>{children}</View>;

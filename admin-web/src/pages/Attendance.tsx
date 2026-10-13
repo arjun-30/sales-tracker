@@ -125,7 +125,7 @@ export function Attendance() {
         <div className={`space-y-6 transition-opacity ${loading ? "opacity-60" : ""}`}>
           <Card className="flex flex-wrap items-center gap-x-10 gap-y-4 px-5 py-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-neutral-900 text-sm font-semibold text-white">
+              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-plum-900 text-sm font-semibold text-white">
                 {emp.name
                   .split(" ")
                   .map((p) => p[0])
@@ -202,7 +202,7 @@ export function Attendance() {
                         <div className="flex items-center justify-end gap-3">
                           <div className="hidden h-1.5 w-28 overflow-hidden rounded-sm bg-neutral-100 sm:block">
                             <div
-                              className="h-full bg-neutral-900"
+                              className="h-full bg-brand-500"
                               style={{ width: `${Math.min(100, (d.minutes / FULL_DAY_MINUTES) * 100)}%` }}
                             />
                           </div>

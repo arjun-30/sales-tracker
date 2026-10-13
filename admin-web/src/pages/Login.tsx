@@ -53,11 +53,10 @@ export function Login() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden bg-neutral-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="paint-stripe absolute inset-x-0 top-0 h-1" />
+      <div className="relative hidden bg-plum-900 p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div>
           <img src="/roalux-logo.png" alt="Roalux" className="h-14 w-auto" />
-          <div className="mt-4 text-[13px] font-medium uppercase tracking-[0.2em] text-neutral-500">Sales Console</div>
+          <div className="mt-4 text-[13px] font-medium uppercase tracking-[0.2em] text-white/50">Sales Console</div>
         </div>
         <div className="space-y-10">
           <h1 className="max-w-md text-[34px] font-semibold leading-tight tracking-tight">
@@ -66,16 +65,16 @@ export function Login() {
           <ul className="max-w-md divide-y divide-white/10 border-y border-white/10">
             {highlights.map(({ icon: Icon, title, text }) => (
               <li key={title} className="flex gap-4 py-4">
-                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brand-500" />
+                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brand-300" />
                 <div>
                   <div className="font-medium">{title}</div>
-                  <div className="mt-0.5 text-sm text-neutral-400">{text}</div>
+                  <div className="mt-0.5 text-sm text-white/60">{text}</div>
                 </div>
               </li>
             ))}
           </ul>
         </div>
-        <div className="text-xs text-neutral-500">Admin access only</div>
+        <div className="text-xs text-white/45">Admin access only</div>
       </div>
 
       <div className="flex items-center justify-center bg-white px-4 py-12">
@@ -94,7 +93,7 @@ export function Login() {
                   {phone.length}/{PHONE_LENGTH}
                 </span>
               </div>
-              <div className="flex h-10 overflow-hidden rounded-md border border-neutral-300 bg-white transition focus-within:border-neutral-900 focus-within:ring-2 focus-within:ring-neutral-900/10">
+              <div className="flex h-10 overflow-hidden rounded-md border border-neutral-300 bg-white transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15">
                 <span className="flex items-center border-r border-neutral-200 bg-neutral-50 px-3 text-sm font-semibold text-neutral-700">
                   +91
                 </span>

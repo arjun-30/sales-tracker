@@ -54,22 +54,21 @@ export function Layout() {
     .toUpperCase();
 
   const sidebar = (
-    <div className="flex h-full flex-col bg-[#1c1c1c] text-neutral-300">
-      <div className="paint-stripe h-[3px] shrink-0" />
+    <div className="flex h-full flex-col bg-plum-900 text-neutral-300">
       <div className="flex h-16 shrink-0 items-center gap-3 border-b border-white/[0.08] px-5">
         <img src="/roalux-logo.png" alt="Roalux" className="h-8 w-auto" />
         <div className="h-6 w-px bg-white/15" />
         <div className="text-[13px] font-semibold leading-tight text-white">
           Sales
           <br />
-          <span className="font-normal text-neutral-400">Console</span>
+          <span className="font-normal text-white/50">Console</span>
         </div>
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {navGroups.map((group) => (
           <div key={group.label}>
-            <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+            <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/35">
               {group.label}
             </div>
             <div className="space-y-0.5">
@@ -82,14 +81,14 @@ export function Layout() {
                   className={({ isActive }) =>
                     `relative flex h-9 items-center gap-3 rounded-md px-3 text-[13.5px] transition-colors ${
                       isActive
-                        ? "bg-white/[0.08] font-semibold text-white before:absolute before:inset-y-2 before:-left-3 before:w-[3px] before:rounded-r before:bg-brand-500"
-                        : "font-medium text-neutral-400 hover:bg-white/[0.04] hover:text-white"
+                        ? "bg-white/[0.08] font-semibold text-white before:absolute before:inset-y-2 before:-left-3 before:w-[3px] before:rounded-r before:bg-brand-300"
+                        : "font-medium text-white/65 hover:bg-white/[0.05] hover:text-white"
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      <Icon className={`h-[17px] w-[17px] ${isActive ? "text-brand-400" : "text-neutral-500"}`} />
+                      <Icon className={`h-[17px] w-[17px] ${isActive ? "text-brand-300" : "text-white/40"}`} />
                       {label}
                     </>
                   )}
@@ -102,18 +101,18 @@ export function Layout() {
 
       <div className="border-t border-white/[0.08] p-3">
         <div className="flex items-center gap-3 rounded-md px-2 py-1.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-600 text-xs font-semibold text-white">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-500 text-xs font-semibold text-white">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold text-white">{user?.name}</div>
-            <div className="text-xs text-neutral-500">Administrator</div>
+            <div className="text-xs text-white/50">Administrator</div>
           </div>
           <button
             onClick={logout}
             title="Log out"
             aria-label="Log out"
-            className="rounded-md p-2 text-neutral-500 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-md p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
           >
             <LogOut className="h-4 w-4" />
           </button>
@@ -123,7 +122,7 @@ export function Layout() {
   );
 
   return (
-    <div className="flex min-h-screen bg-neutral-50">
+    <div className="flex min-h-screen bg-[#f7f6f8]">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 lg:block">{sidebar}</aside>
 
       {open ? (

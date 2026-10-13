@@ -115,13 +115,13 @@ export function Tabs<T extends string>({
             onClick={() => onChange(o.value)}
             className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               active
-                ? "border-neutral-900 text-neutral-900"
+                ? "border-brand-600 text-neutral-900"
                 : "border-transparent text-neutral-500 hover:text-neutral-800"
             }`}
           >
             {o.label}
             {o.count !== undefined ? (
-              <span className={`text-xs tabular-nums ${active ? "text-neutral-900" : "text-neutral-400"}`}>{o.count}</span>
+              <span className={`text-xs tabular-nums ${active ? "text-brand-600" : "text-neutral-400"}`}>{o.count}</span>
             ) : null}
           </button>
         );
@@ -147,7 +147,7 @@ export function Segmented<T extends string>({
           key={o.value}
           onClick={() => onChange(o.value)}
           className={`h-9 px-3 text-[13px] font-medium transition-colors ${i > 0 ? "border-l border-neutral-300" : ""} ${
-            o.value === value ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-50"
+            o.value === value ? "bg-brand-600 text-white" : "text-neutral-600 hover:bg-neutral-50"
           }`}
         >
           {o.label}

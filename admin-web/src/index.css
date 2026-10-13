@@ -1,22 +1,27 @@
 @import "tailwindcss";
 
-/* Roalux admin. Neutral greys (no blue cast) carry the UI; `brand` is the
-   Roalux red, used sparingly for the active nav marker, key figures and the
-   primary chart series; `paint-*` are the six logo swatches, for charts and
-   the logo stripe only. */
+/* Roalux admin. Deep plum chrome (sidebar, login panel) with a violet
+   accent for buttons, the selected page, tabs and the primary chart series.
+   Greys are neutral. `paint-*` are the logo swatches, kept for category
+   charts only. */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --color-brand-50: #fef2f2;
-  --color-brand-100: #fde3e3;
-  --color-brand-200: #fbcaca;
-  --color-brand-300: #f6a3a3;
-  --color-brand-400: #ee6b6b;
-  --color-brand-500: #e33a3a;
-  --color-brand-600: #d4202a;
-  --color-brand-700: #b2171f;
-  --color-brand-800: #93171d;
-  --color-brand-900: #7a191e;
+  --color-brand-50: #f5f2fb;
+  --color-brand-100: #ebe4f7;
+  --color-brand-200: #d6c9ee;
+  --color-brand-300: #b9a3e1;
+  --color-brand-400: #9878d0;
+  --color-brand-500: #7d5abf;
+  --color-brand-600: #6d4bb3;
+  --color-brand-700: #5a3d96;
+  --color-brand-800: #4a337a;
+  --color-brand-900: #3d2b63;
+
+  --color-plum-700: #4a3559;
+  --color-plum-800: #3b2a4a;
+  --color-plum-900: #2e1f3a;
+  --color-plum-950: #24182e;
 
   --color-paint-magenta: #e5007d;
   --color-paint-green: #4db848;
@@ -31,19 +36,7 @@
 }
 
 body {
-  @apply bg-neutral-50 text-neutral-900 antialiased;
+  @apply bg-[#f7f6f8] text-neutral-900 antialiased;
   font-feature-settings: "cv11", "ss01";
 }
 
-/* The six logo swatches as one thin band. */
-.paint-stripe {
-  background: linear-gradient(
-    90deg,
-    var(--color-paint-magenta) 0 16.66%,
-    var(--color-paint-green) 0 33.33%,
-    var(--color-paint-orange) 0 50%,
-    var(--color-paint-red) 0 66.66%,
-    var(--color-paint-blue) 0 83.33%,
-    var(--color-paint-yellow) 0 100%
-  );
-}

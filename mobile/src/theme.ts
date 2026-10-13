@@ -1,12 +1,11 @@
 // Shared look for every screen: change a value here, not in a screen's StyleSheet.
 export const colors = {
-  // Neutral black, matching the admin panel; colour is kept for status only.
-  primary: "#171717",
-  primaryDark: "#000000",
-  primarySoft: "#f5f5f5",
-  // Neutral near-black for dark surfaces (no blue cast).
-  ink: "#171717",
-  inkSoft: "#262626",
+  // Violet accent and deep plum, matching the admin panel.
+  primary: "#6d4bb3",
+  primaryDark: "#5a3d96",
+  primarySoft: "#f5f2fb",
+  ink: "#2e1f3a",
+  inkSoft: "#3b2a4a",
   success: "#15803d",
   successSoft: "#ecfdf5",
   warning: "#b45309",
@@ -19,11 +18,9 @@ export const colors = {
   border: "#e5e5e5",
   borderStrong: "#d4d4d4",
   surface: "#ffffff",
-  background: "#f5f5f5",
+  background: "#f7f6f8",
 };
 
-// The six swatches from the Roalux logo. Accents only, never body text.
-export const paint = ["#e5007d", "#4db848", "#f5921e", "#e31e2d", "#00a6e6", "#ffe500"] as const;
 
 export const radius = { sm: 8, md: 12, lg: 16, pill: 999 };
 
