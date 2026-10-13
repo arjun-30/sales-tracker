@@ -1,27 +1,30 @@
 @import "tailwindcss";
 
-/* Roalux admin. Deep plum chrome (sidebar, login panel) with a violet
+/* Roalux admin. Warm beige chrome (sidebar, login panel) with a cobalt blue
    accent for buttons, the selected page, tabs and the primary chart series.
-   Greys are neutral. `paint-*` are the logo swatches, kept for category
-   charts only. */
+   `sand-*` is the beige family; `paint-*` are the logo swatches, kept for
+   category charts only. */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --color-brand-50: #f5f2fb;
-  --color-brand-100: #ebe4f7;
-  --color-brand-200: #d6c9ee;
-  --color-brand-300: #b9a3e1;
-  --color-brand-400: #9878d0;
-  --color-brand-500: #7d5abf;
-  --color-brand-600: #6d4bb3;
-  --color-brand-700: #5a3d96;
-  --color-brand-800: #4a337a;
-  --color-brand-900: #3d2b63;
+  --color-brand-50: #eef3fc;
+  --color-brand-100: #d9e4f8;
+  --color-brand-200: #b3c8f0;
+  --color-brand-300: #7fa2e4;
+  --color-brand-400: #4a78d3;
+  --color-brand-500: #1f57c3;
+  --color-brand-600: #0047ab;
+  --color-brand-700: #003a8e;
+  --color-brand-800: #002f73;
+  --color-brand-900: #00265d;
 
-  --color-plum-700: #4a3559;
-  --color-plum-800: #3b2a4a;
-  --color-plum-900: #2e1f3a;
-  --color-plum-950: #24182e;
+  --color-sand-50: #faf8f4;
+  --color-sand-100: #f3ede3;
+  --color-sand-200: #e8dfd0;
+  --color-sand-300: #d8cab3;
+  --color-sand-500: #9a8a73;
+  --color-sand-700: #5e5243;
+  --color-sand-900: #2f271f;
 
   --color-paint-magenta: #e5007d;
   --color-paint-green: #4db848;
@@ -36,7 +39,7 @@
 }
 
 body {
-  @apply bg-[#f7f6f8] text-neutral-900 antialiased;
+  @apply bg-sand-50 text-neutral-900 antialiased;
   font-feature-settings: "cv11", "ss01";
 }
 

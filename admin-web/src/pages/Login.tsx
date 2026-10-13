@@ -53,28 +53,28 @@ export function Login() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden bg-plum-900 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+      <div className="relative hidden border-r border-sand-200 bg-sand-100 p-12 text-sand-900 lg:flex lg:flex-col lg:justify-between">
         <div>
           <img src="/roalux-logo.png" alt="Roalux" className="h-14 w-auto" />
-          <div className="mt-4 text-[13px] font-medium uppercase tracking-[0.2em] text-white/50">Sales Console</div>
+          <div className="mt-4 text-[13px] font-medium uppercase tracking-[0.2em] text-sand-500">Sales Console</div>
         </div>
         <div className="space-y-10">
           <h1 className="max-w-md text-[34px] font-semibold leading-tight tracking-tight">
             Your field sales team, on one screen.
           </h1>
-          <ul className="max-w-md divide-y divide-white/10 border-y border-white/10">
+          <ul className="max-w-md divide-y divide-sand-200 border-y border-sand-200">
             {highlights.map(({ icon: Icon, title, text }) => (
               <li key={title} className="flex gap-4 py-4">
-                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brand-300" />
+                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
                 <div>
                   <div className="font-medium">{title}</div>
-                  <div className="mt-0.5 text-sm text-white/60">{text}</div>
+                  <div className="mt-0.5 text-sm text-sand-700">{text}</div>
                 </div>
               </li>
             ))}
           </ul>
         </div>
-        <div className="text-xs text-white/45">Admin access only</div>
+        <div className="text-xs text-sand-500">Admin access only</div>
       </div>
 
       <div className="flex items-center justify-center bg-white px-4 py-12">

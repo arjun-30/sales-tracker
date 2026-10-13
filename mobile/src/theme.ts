@@ -1,11 +1,11 @@
 // Shared look for every screen: change a value here, not in a screen's StyleSheet.
 export const colors = {
-  // Violet accent and deep plum, matching the admin panel.
-  primary: "#6d4bb3",
-  primaryDark: "#5a3d96",
-  primarySoft: "#f5f2fb",
-  ink: "#2e1f3a",
-  inkSoft: "#3b2a4a",
+  // Cobalt accent on warm beige, matching the admin panel.
+  primary: "#0047ab",
+  primaryDark: "#003a8e",
+  primarySoft: "#eef3fc",
+  ink: "#2f271f",
+  inkSoft: "#5e5243",
   success: "#15803d",
   successSoft: "#ecfdf5",
   warning: "#b45309",
@@ -15,10 +15,10 @@ export const colors = {
   text: "#171717",
   textMuted: "#737373",
   textFaint: "#a3a3a3",
-  border: "#e5e5e5",
-  borderStrong: "#d4d4d4",
+  border: "#e8dfd0",
+  borderStrong: "#d8cab3",
   surface: "#ffffff",
-  background: "#f7f6f8",
+  background: "#f3ede3",
 };
 
 

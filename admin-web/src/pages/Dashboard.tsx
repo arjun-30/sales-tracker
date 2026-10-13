@@ -20,10 +20,10 @@ import type { District, ReportSummary } from "../lib/types";
 import { Card, CardHeader, PageHeader, Segmented, StatCard, Status } from "../components/ui/Card";
 import { Select } from "../components/ui/Input";
 
-// Primary series in the violet accent, plum for the second; categories get distinct hues.
-const VIOLET = "#6d4bb3";
-const PLUM = "#2e1f3a";
-const PALETTE = ["#6d4bb3", "#2e1f3a", "#4db848", "#f5921e", "#00a6e6", "#e5007d", "#d4b800", "#a3a3a3"];
+// Primary series in cobalt, warm brown for the second; categories get distinct hues.
+const COBALT = "#0047ab";
+const BROWN = "#8a7458";
+const PALETTE = ["#0047ab", "#bfa98a", "#4db848", "#f5921e", "#00a6e6", "#e5007d", "#d4b800", "#a3a3a3"];
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
@@ -184,7 +184,7 @@ export function Dashboard() {
               <XAxis dataKey="districtName" tick={{ fontSize: 11 }} interval={0} angle={-30} textAnchor="end" height={70} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(value) => formatCurrency(value)} cursor={{ fill: "#f5f5f5" }} />
-              <Bar dataKey="totalSales" fill={VIOLET} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="totalSales" fill={COBALT} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
           )}
@@ -203,7 +203,7 @@ export function Dashboard() {
               <XAxis dataKey="day" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(value) => formatCurrency(value)} />
-              <Line type="monotone" dataKey="total" stroke={VIOLET} strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="total" stroke={COBALT} strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
           )}
@@ -225,7 +225,7 @@ export function Dashboard() {
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={160} />
                 <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Bar dataKey="revenue" fill={PLUM} radius={[0, 2, 2, 0]} />
+                <Bar dataKey="revenue" fill={BROWN} radius={[0, 2, 2, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

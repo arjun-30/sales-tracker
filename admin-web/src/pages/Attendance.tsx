@@ -125,7 +125,7 @@ export function Attendance() {
         <div className={`space-y-6 transition-opacity ${loading ? "opacity-60" : ""}`}>
           <Card className="flex flex-wrap items-center gap-x-10 gap-y-4 px-5 py-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-plum-900 text-sm font-semibold text-white">
+              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-brand-600 text-sm font-semibold text-white">
                 {emp.name
                   .split(" ")
                   .map((p) => p[0])

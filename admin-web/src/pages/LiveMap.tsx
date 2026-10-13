@@ -72,7 +72,7 @@ const STALE_AFTER_MS = 10 * 60 * 1000;
 // as offline instead.
 const OFFLINE_AFTER_MS = 2 * 60 * 60 * 1000;
 
-const COLOR_ACTIVE = "#6d4bb3";
+const COLOR_ACTIVE = "#0047ab";
 const COLOR_STALE = "#a3a3a3";
 
 type Status = "active" | "stale" | "offline";
@@ -242,7 +242,7 @@ export function LiveMap() {
       return {
         fillColor: COLOR_ACTIVE,
         fillOpacity: isSelected ? 0.08 : isHovered ? 0.06 : 0,
-        strokeColor: isSelected ? "#6d4bb3" : isHovered ? "#4a3559" : "#737373",
+        strokeColor: isSelected ? "#0047ab" : isHovered ? "#5e5243" : "#8a7d6b",
         strokeWeight: isSelected ? 2.5 : isHovered ? 1.5 : 0.7,
         strokeOpacity: isSelected ? 1 : isHovered ? 0.9 : 0.45,
         zIndex: isSelected ? 4 : isHovered ? 3 : 2,
@@ -417,7 +417,7 @@ export function LiveMap() {
                     scale: isSelected ? 15 : 13,
                     fillColor: isStale ? COLOR_STALE : COLOR_ACTIVE,
                     fillOpacity: 1,
-                    strokeColor: isSelected ? "#2e1f3a" : "#ffffff",
+                    strokeColor: isSelected ? "#00265d" : "#ffffff",
                     strokeWeight: isSelected ? 3 : 2.5,
                   }}
                 >
