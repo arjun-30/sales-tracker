@@ -12,7 +12,9 @@
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "test": "vitest run",
-    "prune:locations": "tsx scripts/pruneLocationHistory.ts"
+    "prune:locations": "tsx scripts/pruneLocationHistory.ts",
+    "demo:seed": "tsx scripts/seed-demo.ts",
+    "demo:live": "tsx scripts/demo-live.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",

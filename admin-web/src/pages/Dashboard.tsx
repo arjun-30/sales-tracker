@@ -182,7 +182,7 @@ export function Dashboard() {
             <BarChart data={summary.salesByDistrict}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
               <XAxis dataKey="districtName" tick={{ fontSize: 11 }} interval={0} angle={-30} textAnchor="end" height={70} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={compactINR} width={56} />
               <Tooltip formatter={(value) => formatCurrency(value)} cursor={{ fill: "#f5f5f5" }} />
               <Bar dataKey="totalSales" fill={COBALT} radius={[2, 2, 0, 0]} />
             </BarChart>
@@ -201,7 +201,7 @@ export function Dashboard() {
             <LineChart data={summary.ordersOverTime}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
               <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={compactINR} width={56} />
               <Tooltip formatter={(value) => formatCurrency(value)} />
               <Line type="monotone" dataKey="total" stroke={COBALT} strokeWidth={2} dot={false} />
             </LineChart>
@@ -222,7 +222,7 @@ export function Dashboard() {
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={summary.topProducts} layout="vertical" margin={{ left: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
-                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={compactINR} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={160} />
                 <Tooltip formatter={(value) => formatCurrency(value)} />
                 <Bar dataKey="revenue" fill={BROWN} radius={[0, 2, 2, 0]} />
@@ -444,4 +444,12 @@ function ageLabel(createdAt: string): string {
   if (days >= 1) return `${days}d ago`;
   const hours = Math.max(1, Math.floor(ms / (60 * 60 * 1000)));
   return `${hours}h ago`;
+}
+
+// Axis labels in Indian units: ₹8L, ₹75k, ₹1.2Cr.
+function compactINR(value: number): string {
+  if (value >= 1e7) return `₹${+(value / 1e7).toFixed(1)}Cr`;
+  if (value >= 1e5) return `₹${+(value / 1e5).toFixed(1)}L`;
+  if (value >= 1e3) return `₹${+(value / 1e3).toFixed(0)}k`;
+  return `₹${value}`;
 }
