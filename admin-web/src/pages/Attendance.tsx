@@ -92,7 +92,7 @@ export function Attendance() {
               <Input
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
-                placeholder="RLX001"
+                placeholder="RLX-CHN-001"
                 className="pl-9 font-mono tracking-wider"
                 autoFocus={!code}
               />
@@ -115,7 +115,7 @@ export function Attendance() {
           <Clock className="h-8 w-8 text-neutral-300" />
           <div className="mt-3 text-sm font-medium text-neutral-800">Enter an employee code</div>
           <div className="mt-1 max-w-sm text-[13px] text-neutral-500">
-            Codes are on the Employees page, e.g. RLX001. Hours are counted from when the employee goes on duty in the
+            Codes are on the Employees page, e.g. RLX-CHN-001. Hours are counted from when the employee goes on duty in the
             app until they go off duty.
           </div>
         </Card>

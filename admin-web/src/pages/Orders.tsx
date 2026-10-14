@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { api } from "../lib/api";
+import { usePlant } from "../context/PlantContext";
 import { displayProductName, formatDate, formatINR, formatTime } from "../lib/format";
 import type { District, Order, OrderStatus } from "../lib/types";
 import { Card, Notice, OrderStatusLabel, PageHeader, Tabs } from "../components/ui/Card";
@@ -25,6 +26,9 @@ const actionsByStatus: Record<OrderStatus, { to: OrderStatus; label: string }[]>
 type TabValue = "all" | OrderStatus;
 
 export function Orders() {
+  const { isSuperAdmin, plantId } = usePlant();
+  // Which plant a row belongs to, when the super admin is looking at every plant.
+  const showPlant = isSuperAdmin && !plantId;
   const [orders, setOrders] = useState<Order[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [districtFilter, setDistrictFilter] = useState("");
@@ -182,7 +186,10 @@ export function Orders() {
                       </Td>
                       <Td className="whitespace-nowrap">
                         <div className="text-neutral-800">{o.employee.name}</div>
-                        <div className="text-xs text-neutral-500">{o.district.name}</div>
+                        <div className="text-xs text-neutral-500">
+                          {o.district.name}
+                          {showPlant ? ` · ${o.plant.code}` : ""}
+                        </div>
                       </Td>
                       <Td className="whitespace-nowrap">
                         <div className="text-neutral-800">{formatDate(o.createdAt)}</div>

@@ -120,6 +120,8 @@ export default function ProfileScreen() {
           <Divider />
           <Row icon="call-outline" label="Mobile number" value={user?.phone ? `+91 ${user.phone}` : "–"} />
           <Divider />
+          <Row icon="business-outline" label="Plant" value={user?.plant?.name ?? "–"} />
+          <Divider />
           <Row icon="location-outline" label="District" value={user?.district?.name ?? "–"} />
           <Divider />
           <Row icon="information-circle-outline" label="App version" value={version} />

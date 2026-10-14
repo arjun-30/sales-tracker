@@ -15,6 +15,7 @@ export interface User {
   role: Role;
   districtId: string | null;
   district?: District | null;
+  plant?: { id: string; name: string; code: string } | null;
 }
 
 export interface ProductVariant {

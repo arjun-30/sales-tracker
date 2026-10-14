@@ -18,6 +18,8 @@ import {
 import { api } from "../lib/api";
 import type { District, ReportSummary } from "../lib/types";
 import { Card, CardHeader, PageHeader, Segmented, StatCard } from "../components/ui/Card";
+import { Table, Td, Th, Tr } from "../components/ui/Table";
+import { usePlant } from "../context/PlantContext";
 import { Select } from "../components/ui/Input";
 
 // Primary series in cobalt, warm brown for the second; categories get distinct hues.
@@ -59,6 +61,7 @@ function periodStart(id: PeriodId): Date | null {
 }
 
 export function Dashboard() {
+  const { plant, selectPlant } = usePlant();
   const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [districts, setDistricts] = useState<District[]>([]);
   const [period, setPeriod] = useState<PeriodId>("30d");
@@ -135,6 +138,7 @@ export function Dashboard() {
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4" />
             Showing {periodLabel} {districtName ? `in ${districtName}` : "across all districts"}
+            {plant ? ` · ${plant.name}` : summary.plantComparison ? " · all plants" : ""}
           </span>
         }
         actions={filters}
@@ -170,6 +174,60 @@ export function Dashboard() {
           hint="Live count, ignores filters"
         />
       </div>
+
+      {summary.plantComparison && summary.plantComparison.length > 0 ? (
+        <Card className="overflow-x-auto">
+          <CardHeader title="Plants" description={`Sales and activity per plant, ${periodLabel}. Open one to see only that plant.`} />
+          <Table>
+            <thead>
+              <tr>
+                <Th>Plant</Th>
+                <Th className="text-right">Sales</Th>
+                <Th className="text-right">Share</Th>
+                <Th className="text-right">Orders</Th>
+                <Th className="text-right">Visits</Th>
+                <Th className="text-right">Staff</Th>
+                <Th className="text-right">On duty</Th>
+                <Th />
+              </tr>
+            </thead>
+            <tbody>
+              {summary.plantComparison.map((p) => {
+                const share = summary.totalSales > 0 ? p.totalSales / summary.totalSales : 0;
+                return (
+                  <Tr key={p.plantId}>
+                    <Td>
+                      <div className="font-medium text-neutral-900">{p.name}</div>
+                      <div className="font-mono text-xs tracking-wider text-neutral-500">{p.code}</div>
+                    </Td>
+                    <Td className="text-right font-semibold tabular-nums text-neutral-900">{formatCurrency(p.totalSales)}</Td>
+                    <Td className="text-right">
+                      <div className="ml-auto flex w-28 items-center justify-end gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
+                          <div className="h-full bg-brand-600" style={{ width: `${Math.round(share * 100)}%` }} />
+                        </div>
+                        <span className="w-9 text-right text-xs tabular-nums text-neutral-600">{Math.round(share * 100)}%</span>
+                      </div>
+                    </Td>
+                    <Td className="text-right tabular-nums">{p.ordersCount.toLocaleString("en-IN")}</Td>
+                    <Td className="text-right tabular-nums">{p.visitsCount.toLocaleString("en-IN")}</Td>
+                    <Td className="text-right tabular-nums">{p.employeeCount}</Td>
+                    <Td className="text-right tabular-nums">{p.onDutyCount}</Td>
+                    <Td className="text-right">
+                      <button
+                        onClick={() => selectPlant(p.plantId)}
+                        className="text-[13px] font-medium text-brand-600 hover:underline"
+                      >
+                        Open
+                      </button>
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>

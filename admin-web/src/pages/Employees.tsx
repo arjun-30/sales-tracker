@@ -4,12 +4,16 @@ import { Clock, Plus, Search, UserCheck, Users, UserX } from "lucide-react";
 import { api } from "../lib/api";
 import { formatMinutes, timeAgo } from "../lib/format";
 import type { District, Employee } from "../lib/types";
+import { usePlant } from "../context/PlantContext";
 import { Card, CardHeader, Notice, PageHeader, StatCard, Status } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select } from "../components/ui/Input";
 import { MessageRow, Table, Td, Th, Tr } from "../components/ui/Table";
 
 export function Employees() {
+  const { isSuperAdmin, plants, plantId: viewingPlant, plant: currentPlant } = usePlant();
+  // With every plant in view, the super admin sees which plant each person is in.
+  const showPlant = isSuperAdmin && !viewingPlant;
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +27,10 @@ export function Employees() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [districtId, setDistrictId] = useState("");
+  const [newPlantId, setNewPlantId] = useState(viewingPlant || plants[0]?.id || "");
+  useEffect(() => {
+    if (!newPlantId && plants.length > 0) setNewPlantId(plants[0].id);
+  }, [plants, newPlantId]);
 
   function refresh() {
     setLoading(true);
@@ -43,7 +51,7 @@ export function Employees() {
     const q = query.trim().toLowerCase();
     if (!q) return employees;
     return employees.filter((e) =>
-      [e.name, e.phone, e.employeeCode, e.district?.name].some((v) => v?.toLowerCase().includes(q))
+      [e.name, e.phone, e.employeeCode, e.district?.name, e.plant?.name].some((v) => v?.toLowerCase().includes(q))
     );
   }, [employees, query]);
 
@@ -58,7 +66,7 @@ export function Employees() {
     try {
       const { employee } = await api<{ employee: Employee }>("/api/employees", {
         method: "POST",
-        body: JSON.stringify({ name, phone, password, districtId }),
+        body: JSON.stringify({ name, phone, password, districtId, ...(isSuperAdmin ? { plantId: newPlantId } : {}) }),
       });
       setName("");
       setPhone("");
@@ -91,6 +99,25 @@ export function Employees() {
     }
   }
 
+  async function moveToPlant(emp: Employee, targetId: string) {
+    const target = plants.find((p) => p.id === targetId);
+    if (!target || targetId === emp.plantId) return;
+    const ok = window.confirm(
+      `Move ${emp.name} to ${target.name}? They get a new employee code there (RLX-${target.code}-…). Orders and visits they already logged stay with ${emp.plant?.name ?? "their old plant"}.`
+    );
+    if (!ok) return;
+    try {
+      const { employee } = await api<{ employee: Employee }>(`/api/employees/${emp.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ plantId: target.id }),
+      });
+      setNotice({ tone: "ok", text: `${employee.name} moved to ${target.name} as ${employee.employeeCode}.` });
+      refresh();
+    } catch (err) {
+      setNotice({ tone: "error", text: err instanceof Error ? err.message : "Could not move the employee" });
+    }
+  }
+
   async function toggleActive(emp: Employee) {
     if (emp.active && !window.confirm(`Disable ${emp.name}? They will be taken off duty and can't log in.`)) return;
     try {
@@ -105,7 +132,11 @@ export function Employees() {
     <div className="space-y-6">
       <PageHeader
         title="Employees"
-        description="Field sales staff, their employee codes, districts and today's duty."
+        description={
+          currentPlant
+            ? `Field sales staff at ${currentPlant.name}, their codes, districts and today's duty.`
+            : "Field sales staff at every plant, their codes, districts and today's duty."
+        }
         actions={
           <Button onClick={() => setShowForm((s) => !s)} variant={showForm ? "secondary" : "primary"}>
             {showForm ? (
@@ -135,9 +166,21 @@ export function Employees() {
         <Card>
           <CardHeader
             title="New employee"
-            description="An employee code (RLX…) is assigned automatically. Share the phone number and password with them."
+            description="An employee code with the plant in it (RLX-CHN-…) is assigned automatically. Share the phone number and password with them."
           />
           <form onSubmit={handleCreate} className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+            {isSuperAdmin ? (
+              <div className="sm:col-span-2 lg:col-span-4 lg:max-w-sm">
+                <Label>Plant</Label>
+                <Select value={newPlantId} onChange={(e) => setNewPlantId(e.target.value)} required>
+                  {plants.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.code})
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            ) : null}
             <div>
               <Label>Full name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} required />
@@ -175,7 +218,7 @@ export function Employees() {
               </div>
             )}
             <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
-              <Button type="submit" disabled={submitting || phone.length !== 10}>
+              <Button type="submit" disabled={submitting || phone.length !== 10 || (isSuperAdmin && !newPlantId)}>
                 {submitting ? "Creating…" : "Create employee"}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
@@ -209,6 +252,7 @@ export function Employees() {
               <Th>Code</Th>
               <Th>Employee</Th>
               <Th>District</Th>
+              {isSuperAdmin ? <Th>Plant</Th> : null}
               <Th>Duty</Th>
               <Th className="text-right">Today</Th>
               <Th>Account</Th>
@@ -216,9 +260,9 @@ export function Employees() {
             </tr>
           </thead>
           <tbody>
-            {loading && <MessageRow colSpan={7}>Loading employees…</MessageRow>}
+            {loading && <MessageRow colSpan={isSuperAdmin ? 8 : 7}>Loading employees…</MessageRow>}
             {!loading && visible.length === 0 && (
-              <MessageRow colSpan={7}>{employees.length ? "Nobody matches that search." : "No employees yet."}</MessageRow>
+              <MessageRow colSpan={isSuperAdmin ? 8 : 7}>{employees.length ? "Nobody matches that search." : "No employees yet."}</MessageRow>
             )}
             {!loading &&
               visible.map((emp) => {
@@ -233,6 +277,22 @@ export function Employees() {
                       <div className="text-xs tabular-nums text-neutral-500">{emp.phone}</div>
                     </Td>
                     <Td>{emp.district?.name ?? "—"}</Td>
+                    {isSuperAdmin ? (
+                      <Td>
+                        <Select
+                          value={emp.plantId ?? ""}
+                          onChange={(e) => moveToPlant(emp, e.target.value)}
+                          title="Move to another plant"
+                          className={`h-8 max-w-48 text-[13px] ${showPlant ? "" : "text-neutral-500"}`}
+                        >
+                          {plants.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </Select>
+                      </Td>
+                    ) : null}
                     <Td>
                       {loc?.onDuty ? (
                         <Status tone="green">On duty</Status>

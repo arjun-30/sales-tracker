@@ -9,6 +9,8 @@ import { Employees } from "./pages/Employees";
 import { Products } from "./pages/Products";
 import { Dashboard } from "./pages/Dashboard";
 import { Attendance } from "./pages/Attendance";
+import { Stores } from "./pages/Stores";
+import { Plants } from "./pages/Plants";
 
 function App() {
   return (
@@ -29,6 +31,8 @@ function App() {
         <Route path="products" element={<Products />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="attendance" element={<Attendance />} />
+        <Route path="stores" element={<Stores />} />
+        <Route path="plants" element={<Plants />} />
       </Route>
     </Routes>
   );

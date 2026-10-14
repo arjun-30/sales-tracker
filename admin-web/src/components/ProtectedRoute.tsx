@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { isAdminRole, useAuth } from "../context/AuthContext";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -11,7 +11,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  if (user.role !== "admin") {
+  if (!isAdminRole(user.role)) {
     return (
       <div className="flex min-h-screen items-center justify-center text-neutral-600">
         This admin panel is for admin accounts only.

@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, clearTokens, getAccessToken, setTokens } from "../lib/api";
 import { connectSocket, disconnectSocket } from "../lib/socket";
-import type { AuthUser } from "../lib/types";
+import type { AuthUser, Role } from "../lib/types";
+
+export const isAdminRole = (role: Role) => role === "admin" || role === "super_admin";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -24,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api<{ user: AuthUser }>("/api/auth/me");
       setUser(data.user);
-      if (data.user.role === "admin") connectSocket();
+      if (isAdminRole(data.user.role)) connectSocket();
     } catch {
       clearTokens();
       setUser(null);
@@ -44,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
     setTokens(data.accessToken, data.refreshToken);
     setUser(data.user);
-    if (data.user.role === "admin") connectSocket();
+    if (isAdminRole(data.user.role)) connectSocket();
   }, []);
 
   const logout = useCallback(() => {

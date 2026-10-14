@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Clock, MapPin, Receipt, Search, Store, Timer, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
+import { usePlant } from "../context/PlantContext";
 import { formatDay, formatINR, formatMinutes, formatTime } from "../lib/format";
 import type { District, Employee, Order, Visit } from "../lib/types";
 import { Card, PageHeader, Segmented, StatCard, Tabs } from "../components/ui/Card";
@@ -37,6 +38,9 @@ function minutesBetween(from: string, to: string | null): number {
 const sameShop = (a: string | null, b: string) => !!a && a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export function Visits() {
+  const { isSuperAdmin, plantId } = usePlant();
+  // Which plant a row belongs to, when the super admin is looking at every plant.
+  const showPlant = isSuperAdmin && !plantId;
   const [visits, setVisits] = useState<Visit[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
@@ -228,7 +232,10 @@ export function Visits() {
                         </Td>
                         <Td className="whitespace-nowrap">
                           <div className="text-neutral-800">{v.employee.name}</div>
-                          <div className="text-xs text-neutral-500">{v.district.name}</div>
+                          <div className="text-xs text-neutral-500">
+                          {v.district.name}
+                          {showPlant ? ` · ${v.plant.code}` : ""}
+                        </div>
                         </Td>
                         <Td className="whitespace-nowrap tabular-nums">
                           {formatTime(v.checkInAt)} –{" "}

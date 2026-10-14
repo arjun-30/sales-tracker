@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Layers, Package, Plus, Search } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Factory, Layers, Package, Plus, Search } from "lucide-react";
 import { api } from "../lib/api";
 import { formatINR } from "../lib/format";
 import type { Product, ProductVariant } from "../lib/types";
+import { usePlant } from "../context/PlantContext";
 import { Card, CardHeader, Notice, PageHeader, StatCard, Tabs } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select } from "../components/ui/Input";
@@ -12,7 +13,19 @@ type TabValue = "all" | "unpriced";
 
 const isUnpriced = (v: ProductVariant) => v.active && v.price <= 0;
 
-function PriceEditor({ product, onSaved }: { product: Product; onSaved: (variants: ProductVariant[]) => void }) {
+// With a plant in view (always, for a plant admin) prices are that plant's own;
+// with every plant in view the super admin edits the company prices that
+// plants without their own price sell at.
+function PriceEditor({
+  product,
+  plantId,
+  onSaved,
+}: {
+  product: Product;
+  plantId: string;
+  onSaved: (variants: ProductVariant[]) => void;
+}) {
+  const { isSuperAdmin } = usePlant();
   const [draft, setDraft] = useState<Record<string, string>>(() =>
     Object.fromEntries(product.variants.map((v) => [v.id, v.price > 0 ? String(v.price) : ""]))
   );
@@ -25,18 +38,38 @@ function PriceEditor({ product, onSaved }: { product: Product; onSaved: (variant
   });
   const invalid = changed.some((v) => !(Number(draft[v.id]) > 0));
 
+  function savePrice(v: ProductVariant, price: number | null) {
+    const request = plantId
+      ? api<{ variant: ProductVariant }>(`/api/products/variants/${v.id}/plant-price`, {
+          method: "PUT",
+          body: JSON.stringify({ price, ...(isSuperAdmin ? { plantId } : {}) }),
+        })
+      : api<{ variant: ProductVariant }>(`/api/products/variants/${v.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ price }),
+        }).then((d) => ({ variant: { ...d.variant, basePrice: d.variant.price, plantPrice: null } }));
+    return request.then((d) => d.variant);
+  }
+
+  async function revertToCompanyPrice(v: ProductVariant) {
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await savePrice(v, null);
+      setDraft((d) => ({ ...d, [v.id]: saved.price > 0 ? String(saved.price) : "" }));
+      onSaved([saved]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the price");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveAll() {
     setSaving(true);
     setError(null);
     try {
-      const saved = await Promise.all(
-        changed.map((v) =>
-          api<{ variant: ProductVariant }>(`/api/products/variants/${v.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ price: Number(draft[v.id]) }),
-          }).then((d) => d.variant)
-        )
-      );
+      const saved = await Promise.all(changed.map((v) => savePrice(v, Number(draft[v.id]))));
       onSaved(saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save prices");
@@ -71,6 +104,25 @@ function PriceEditor({ product, onSaved }: { product: Product; onSaved: (variant
                   className={`pl-7 tabular-nums ${missing ? "border-red-300" : ""}`}
                 />
               </div>
+              {plantId ? (
+                <span className="mt-1 flex items-center justify-between gap-1 text-[11px] text-neutral-500">
+                  {v.plantPrice !== null ? (
+                    <>
+                      <span>Company {v.basePrice > 0 ? formatINR(v.basePrice) : "—"}</span>
+                      <button
+                        type="button"
+                        onClick={() => revertToCompanyPrice(v)}
+                        disabled={saving}
+                        className="font-medium text-brand-600 hover:underline"
+                      >
+                        Use company
+                      </button>
+                    </>
+                  ) : (
+                    <span>Company price</span>
+                  )}
+                </span>
+              ) : null}
             </label>
           );
         })}
@@ -88,6 +140,7 @@ function PriceEditor({ product, onSaved }: { product: Product; onSaved: (variant
 }
 
 export function Products() {
+  const { isSuperAdmin, plantId, plant } = usePlant();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -115,6 +168,7 @@ export function Products() {
   const allSizes = products.flatMap((p) => p.variants.filter((v) => v.active));
   const unpricedSizes = allSizes.filter((v) => v.price <= 0).length;
   const productsMissing = products.filter((p) => p.variants.some(isUnpriced)).length;
+  const ownPrices = allSizes.filter((v) => v.plantPrice !== null).length;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -158,8 +212,14 @@ export function Products() {
     <div className="space-y-6">
       <PageHeader
         title="Products & Prices"
-        description="The catalogue salespeople order from. A size can only be ordered once it has a price."
+        description={
+          plantId
+            ? `Prices at ${plant?.name ?? "this plant"}. A size without a price of its own sells at the company price.`
+            : "Company prices, used by every plant that hasn't set its own. Pick a plant at the top left to set its prices."
+        }
         actions={
+          // The product list is shared by every plant, so only the super admin adds to it.
+          isSuperAdmin && (
           <Button onClick={() => setShowForm((s) => !s)} variant={showForm ? "secondary" : "primary"}>
             {showForm ? (
               "Close"
@@ -169,12 +229,22 @@ export function Products() {
               </>
             )}
           </Button>
+          )
         }
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Products" value={products.length} icon={Package} hint={`${categories.length} categories`} />
-        <StatCard label="Pack sizes" value={allSizes.length} icon={Layers} hint="Active sizes on sale" />
+        {plantId ? (
+          <StatCard
+            label="Plant's own prices"
+            value={ownPrices}
+            icon={Factory}
+            hint={`${allSizes.length - ownPrices} sizes at the company price`}
+          />
+        ) : (
+          <StatCard label="Pack sizes" value={allSizes.length} icon={Layers} hint="Active sizes on sale" />
+        )}
         <StatCard label="Sizes with a price" value={allSizes.length - unpricedSizes} icon={CheckCircle2} hint="Can be ordered" />
         <StatCard
           label="Sizes missing a price"
@@ -185,7 +255,7 @@ export function Products() {
         />
       </div>
 
-      {showForm && (
+      {isSuperAdmin && showForm && (
         <Card>
           <CardHeader title="New product" description="Add pack sizes and prices after creating it." />
           <form onSubmit={handleCreate} className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-3">
@@ -300,7 +370,12 @@ export function Products() {
                               <span key={v.id} className="whitespace-nowrap">
                                 <span className="text-neutral-500">{v.sizeLabel}</span>{" "}
                                 {v.price > 0 ? (
-                                  <span className="font-medium tabular-nums text-neutral-900">{formatINR(v.price)}</span>
+                                  <span
+                                    className={`font-medium tabular-nums ${v.plantPrice !== null ? "text-brand-700" : "text-neutral-900"}`}
+                                    title={v.plantPrice !== null ? `Plant price. Company price ${formatINR(v.basePrice)}` : undefined}
+                                  >
+                                    {formatINR(v.price)}
+                                  </span>
                                 ) : (
                                   <span className="font-medium text-red-600">—</span>
                                 )}
@@ -313,7 +388,7 @@ export function Products() {
                       <tr className="border-b border-neutral-200 bg-neutral-50">
                         <td />
                         <td colSpan={4} className="px-4 pb-5 pt-2">
-                          <PriceEditor product={p} onSaved={(saved) => applySaved(p.id, saved)} />
+                          <PriceEditor product={p} plantId={plantId} onSaved={(saved) => applySaved(p.id, saved)} />
                         </td>
                       </tr>
                     )}

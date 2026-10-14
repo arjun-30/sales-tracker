@@ -35,9 +35,23 @@ export async function tryRefresh(): Promise<string | null> {
   return data.accessToken as string;
 }
 
+// The plant the super admin is looking at ("" = every plant), sent as
+// ?plantId with every request. The server ignores it for plant admins, who
+// only ever see their own plant.
+let scopePlantId = "";
+
+export function setScopePlantId(plantId: string) {
+  scopePlantId = plantId;
+}
+
+function withPlantScope(path: string): string {
+  if (!scopePlantId || !path.startsWith("/api/") || path.startsWith("/api/auth/")) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}plantId=${encodeURIComponent(scopePlantId)}`;
+}
+
 export async function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   const token = getAccessToken();
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_URL}${withPlantScope(path)}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",

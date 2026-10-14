@@ -2,7 +2,9 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   BarChart3,
+  Building2,
   Clock,
+  Factory,
   LogOut,
   MapPinned,
   Menu,
@@ -14,8 +16,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { usePlant } from "../context/PlantContext";
 
-const navGroups: { label: string; items: { to: string; label: string; icon: LucideIcon; end?: boolean }[] }[] = [
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; superOnly?: boolean };
+
+const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: "Overview",
     items: [
@@ -28,6 +33,7 @@ const navGroups: { label: string; items: { to: string; label: string; icon: Luci
     items: [
       { to: "/orders", label: "Orders", icon: Receipt },
       { to: "/visits", label: "Shop Visits", icon: Store },
+      { to: "/stores", label: "Stores", icon: Building2 },
       { to: "/products", label: "Products & Prices", icon: Package },
     ],
   },
@@ -36,12 +42,45 @@ const navGroups: { label: string; items: { to: string; label: string; icon: Luci
     items: [
       { to: "/employees", label: "Employees", icon: Users },
       { to: "/attendance", label: "Attendance", icon: Clock },
+      { to: "/plants", label: "Plants & Admins", icon: Factory, superOnly: true },
     ],
   },
 ];
 
+// The super admin picks which plant every page shows; a plant admin sees the
+// name of theirs.
+function PlantSwitcher() {
+  const { isSuperAdmin, plants, plantId, plant, selectPlant } = usePlant();
+  if (!isSuperAdmin) {
+    return (
+      <div className="rounded-md border border-sand-200 bg-white/60 px-3 py-2">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-sand-500">Plant</div>
+        <div className="truncate text-[13.5px] font-semibold text-sand-900">{plant?.name ?? "—"}</div>
+      </div>
+    );
+  }
+  return (
+    <label className="block">
+      <span className="px-1 text-[11px] font-semibold uppercase tracking-wider text-sand-500">Viewing</span>
+      <select
+        value={plantId}
+        onChange={(e) => selectPlant(e.target.value)}
+        className="mt-1 h-9 w-full rounded-md border border-sand-300 bg-white px-2.5 text-[13.5px] font-semibold text-sand-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
+      >
+        <option value="">All plants</option>
+        {plants.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name} ({p.code})
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function Layout() {
   const { user, logout } = useAuth();
+  const { isSuperAdmin, plantId, plant } = usePlant();
   const [open, setOpen] = useState(false);
   // The live map fills the whole content area instead of the padded column.
   const fullBleed = useLocation().pathname === "/";
@@ -65,6 +104,10 @@ export function Layout() {
         </div>
       </div>
 
+      <div className="border-b border-sand-200 px-3 py-3">
+        <PlantSwitcher />
+      </div>
+
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {navGroups.map((group) => (
           <div key={group.label}>
@@ -72,7 +115,9 @@ export function Layout() {
               {group.label}
             </div>
             <div className="space-y-0.5">
-              {group.items.map(({ to, label, icon: Icon, end }) => (
+              {group.items
+                .filter((item) => isSuperAdmin || !item.superOnly)
+                .map(({ to, label, icon: Icon, end }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -106,7 +151,9 @@ export function Layout() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold text-sand-900">{user?.name}</div>
-            <div className="text-xs text-sand-500">Administrator</div>
+            <div className="truncate text-xs text-sand-500">
+              {isSuperAdmin ? "Super admin" : `Plant admin${plant ? ` · ${plant.code}` : ""}`}
+            </div>
           </div>
           <button
             onClick={logout}
@@ -146,12 +193,13 @@ export function Layout() {
         {/* The live map is a full-bleed page; everything else sits in the padded column. */}
         {fullBleed ? (
           <main className="flex-1">
-            <Outlet />
+            <Outlet key={plantId} />
           </main>
         ) : (
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            {/* Keyed by plant so every page reloads its data when the super admin switches plant. */}
             <div className="mx-auto max-w-[1400px]">
-              <Outlet />
+              <Outlet key={plantId} />
             </div>
           </main>
         )}

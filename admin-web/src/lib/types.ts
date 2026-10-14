@@ -1,4 +1,42 @@
-export type Role = "admin" | "sales_employee";
+export type Role = "admin" | "sales_employee" | "super_admin";
+
+export interface PlantRef {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export interface Plant extends PlantRef {
+  address: string | null;
+  adminCount: number;
+  employeeCount: number;
+  storeCount: number;
+}
+
+export interface PlantAdmin {
+  id: string;
+  name: string;
+  phone: string;
+  active: boolean;
+  plantId: string | null;
+  plant: PlantRef | null;
+  createdAt: string;
+}
+
+export interface Store {
+  id: string;
+  plantId: string;
+  name: string;
+  ownerName: string | null;
+  phone: string | null;
+  address: string | null;
+  lat: number;
+  lng: number;
+  notes: string | null;
+  createdAt: string;
+  plant: PlantRef;
+  createdBy: { id: string; name: string } | null;
+}
 
 export interface District {
   id: string;
@@ -14,6 +52,8 @@ export interface AuthUser {
   employeeCode?: string | null;
   role: Role;
   districtId: string | null;
+  plantId: string | null;
+  plant: PlantRef | null;
 }
 
 export interface Employee {
@@ -25,6 +65,8 @@ export interface Employee {
   active: boolean;
   districtId: string | null;
   district: District | null;
+  plantId: string | null;
+  plant: PlantRef | null;
   createdAt: string;
   employeeLocation: EmployeeLocation | null;
 }
@@ -37,7 +79,15 @@ export interface EmployeeLocation {
   accuracy: number | null;
   onDuty: boolean;
   updatedAt: string;
-  user?: { id: string; name: string; districtId: string | null; district: District | null };
+  user?: {
+    id: string;
+    name: string;
+    employeeCode?: string | null;
+    districtId: string | null;
+    district: District | null;
+    plantId?: string | null;
+    plant?: PlantRef | null;
+  };
 }
 
 export interface ProductVariant {
@@ -45,7 +95,10 @@ export interface ProductVariant {
   productId: string;
   sizeLabel: string;
   unit: string;
+  // What the plant being viewed sells at: its own price, else the company price.
   price: number;
+  basePrice: number;
+  plantPrice: number | null;
   sortOrder: number;
   active: boolean;
 }
@@ -82,6 +135,8 @@ export interface Order {
   createdAt: string;
   employee: { id: string; name: string };
   district: District;
+  plantId: string;
+  plant: PlantRef;
   items: OrderItem[];
 }
 
@@ -99,9 +154,22 @@ export interface Visit {
   notes: string | null;
   employee: { id: string; name: string };
   district: District;
+  plantId: string;
+  plant: PlantRef;
 }
 
 export interface ReportSummary {
+  // Only for the super admin looking at every plant.
+  plantComparison?: {
+    plantId: string;
+    name: string;
+    code: string;
+    totalSales: number;
+    ordersCount: number;
+    visitsCount: number;
+    employeeCount: number;
+    onDutyCount: number;
+  }[];
   totalOrders: number;
   totalSales: number;
   totalVisits: number;

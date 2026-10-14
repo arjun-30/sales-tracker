@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DataF, GoogleMap, InfoWindowF, MarkerF, PolygonF, useJsApiLoader } from "@react-google-maps/api";
-import { Crosshair, MapPin, WifiOff } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Building2, Crosshair, MapPin, WifiOff } from "lucide-react";
 import { api } from "../lib/api";
 import { connectSocket } from "../lib/socket";
-import type { District, EmployeeLocation } from "../lib/types";
+import type { District, EmployeeLocation, Store } from "../lib/types";
+import { usePlant } from "../context/PlantContext";
 import { Select } from "../components/ui/Input";
 
 const TAMIL_NADU_CENTER = { lat: 10.8284, lng: 78.7638 };
@@ -74,6 +76,10 @@ const OFFLINE_AFTER_MS = 2 * 60 * 60 * 1000;
 
 const COLOR_ACTIVE = "#0047ab";
 const COLOR_STALE = "#a3a3a3";
+const COLOR_STORE = "#2f271f";
+
+// A small house outline, so stores read differently from the round staff markers.
+const STORE_PATH = "M -7 -1 L 0 -8 L 7 -1 L 7 7 L -7 7 Z";
 
 type Status = "active" | "stale" | "offline";
 
@@ -85,6 +91,7 @@ function statusOf(updatedAt: string, now: number): Status {
 interface LiveEntry {
   employeeId: string;
   name: string;
+  plantId?: string | null;
   districtId: string | null;
   lat: number;
   lng: number;
@@ -115,6 +122,7 @@ function timeAgo(iso: string, now: number): string {
 }
 
 export function LiveMap() {
+  const { isSuperAdmin, plantId, plants } = usePlant();
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "",
   });
@@ -123,6 +131,9 @@ export function LiveMap() {
   const [districtFilter, setDistrictFilter] = useState("");
   const [entries, setEntries] = useState<Record<string, LiveEntry>>({});
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [showStores, setShowStores] = useState(true);
+  const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [geoReady, setGeoReady] = useState(false);
   const [hoveredDistrict, setHoveredDistrict] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -152,6 +163,7 @@ export function LiveMap() {
 
   useEffect(() => {
     api<{ districts: District[] }>("/api/districts").then((d) => setDistricts(d.districts));
+    api<{ stores: Store[] }>("/api/stores").then((d) => setStores(d.stores));
 
     api<{ locations: EmployeeLocation[] }>("/api/tracking/live").then((d) => {
       const next: Record<string, LiveEntry> = {};
@@ -160,6 +172,7 @@ export function LiveMap() {
         next[loc.userId] = {
           employeeId: loc.userId,
           name: loc.user.name,
+          plantId: loc.user.plantId,
           districtId: loc.user.districtId,
           lat: loc.lat,
           lng: loc.lng,
@@ -171,10 +184,15 @@ export function LiveMap() {
     });
 
     const socket = connectSocket();
+    // The super admin's socket hears every plant; with one plant picked, the
+    // others' staff stay off this map.
+    const otherPlant = (payload: LiveEntry) => !!plantId && payload.plantId !== plantId;
     const onLocation = (payload: LiveEntry) => {
+      if (otherPlant(payload)) return;
       setEntries((prev) => ({ ...prev, [payload.employeeId]: { ...prev[payload.employeeId], ...payload } }));
     };
     const onDuty = (payload: LiveEntry) => {
+      if (otherPlant(payload)) return;
       setEntries((prev) => {
         if (!payload.onDuty) {
           const next = { ...prev };
@@ -190,7 +208,13 @@ export function LiveMap() {
       socket.off("employee:location", onLocation);
       socket.off("employee:duty", onDuty);
     };
+    // The page remounts when the plant changes, so plantId is fixed for its life.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const plantCodeById = useMemo(() => new Map(plants.map((p) => [p.id, p.code])), [plants]);
+  // Shown next to names only when the super admin is looking at every plant.
+  const plantTag = (id?: string | null) => (isSuperAdmin && !plantId && id ? plantCodeById.get(id) : undefined);
 
   const visibleEntries = useMemo(
     () =>
@@ -209,6 +233,7 @@ export function LiveMap() {
   const districtNameById = useMemo(() => new Map(districts.map((d) => [d.id, d.name])), [districts]);
 
   const onSelectEmployee = useCallback((id: string) => {
+    setSelectedStore(null);
     setSelectedEmployee((cur) => (cur === id ? null : id));
   }, []);
 
@@ -350,7 +375,10 @@ export function LiveMap() {
             onUnmount={() => {
               mapRef.current = null;
             }}
-            onClick={() => setSelectedEmployee(null)}
+            onClick={() => {
+              setSelectedEmployee(null);
+              setSelectedStore(null);
+            }}
           >
             {mask && (
               <>
@@ -401,6 +429,50 @@ export function LiveMap() {
               onMouseOver={onDataMouseOver}
               onMouseOut={onDataMouseOut}
             />
+            {showStores &&
+              stores.map((st) => (
+                <MarkerF
+                  key={st.id}
+                  position={{ lat: st.lat, lng: st.lng }}
+                  title={st.name}
+                  zIndex={selectedStore === st.id ? 900 : 5}
+                  onClick={() => {
+                    setSelectedEmployee(null);
+                    setSelectedStore((cur) => (cur === st.id ? null : st.id));
+                  }}
+                  icon={{
+                    path: STORE_PATH,
+                    scale: 1,
+                    fillColor: COLOR_STORE,
+                    fillOpacity: 0.9,
+                    strokeColor: "#ffffff",
+                    strokeWeight: 1.5,
+                  }}
+                >
+                  {selectedStore === st.id && (
+                    <InfoWindowF position={{ lat: st.lat, lng: st.lng }} onCloseClick={() => setSelectedStore(null)}>
+                      <div className="min-w-44 space-y-1 p-1 text-sm">
+                        <div className="font-semibold text-neutral-900">{st.name}</div>
+                        {st.ownerName || st.phone ? (
+                          <div className="text-xs text-neutral-600">
+                            {[st.ownerName, st.phone].filter(Boolean).join(" · ")}
+                          </div>
+                        ) : null}
+                        {st.address ? <div className="text-xs text-neutral-500">{st.address}</div> : null}
+                        {plantTag(st.plantId) ? <div className="text-xs text-neutral-500">{st.plant.name}</div> : null}
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${st.lat},${st.lng}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block pt-1 text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          Open in Google Maps
+                        </a>
+                      </div>
+                    </InfoWindowF>
+                  )}
+                </MarkerF>
+              ))}
             {onMap.map((e) => {
               const isStale = e.status === "stale";
               const isSelected = selectedEmployee === e.employeeId;
@@ -426,7 +498,10 @@ export function LiveMap() {
                       <div className="min-w-40 space-y-1 p-1 text-sm">
                         <div className="font-semibold text-neutral-900">{e.name}</div>
                         {e.districtId && (
-                          <div className="text-xs text-neutral-500">{districtNameById.get(e.districtId)}</div>
+                          <div className="text-xs text-neutral-500">
+                            {districtNameById.get(e.districtId)}
+                            {plantTag(e.plantId) ? ` · ${plantTag(e.plantId)}` : ""}
+                          </div>
                         )}
                         <div className={isStale ? "text-xs font-medium text-amber-600" : "text-xs text-neutral-500"}>
                           {isStale ? "No signal since" : "Updated"} {timeAgo(e.updatedAt, now)}
@@ -481,6 +556,14 @@ export function LiveMap() {
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_STALE }} />
                 No signal 10+ min
               </span>
+              {showStores && stores.length > 0 ? (
+                <span className="flex items-center gap-1.5">
+                  <svg viewBox="-8 -9 16 17" className="h-3 w-3">
+                    <path d={STORE_PATH} fill={COLOR_STORE} />
+                  </svg>
+                  Store
+                </span>
+              ) : null}
             </div>
           </>
         )}
@@ -504,6 +587,25 @@ export function LiveMap() {
             <Stat label="Active" value={activeCount} tone="text-brand-600" />
             <Stat label="No signal" value={staleCount} tone="text-neutral-500" />
             <Stat label="Offline" value={offline.length} tone="text-neutral-400" />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-neutral-200 px-3 py-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                checked={showStores}
+                onChange={(e) => {
+                  setShowStores(e.target.checked);
+                  setSelectedStore(null);
+                }}
+                className="h-4 w-4 accent-brand-600"
+              />
+              <Building2 className="h-4 w-4 text-neutral-500" />
+              Show stores
+              <span className="tabular-nums text-neutral-400">{stores.length}</span>
+            </label>
+            <Link to="/stores" className="text-xs font-medium text-brand-600 hover:underline">
+              Manage
+            </Link>
           </div>
         </div>
 
@@ -537,6 +639,7 @@ export function LiveMap() {
                         <span className="block truncate text-sm font-medium text-neutral-900">{e.name}</span>
                         <span className="block truncate text-xs text-neutral-500">
                           {(e.districtId && districtNameById.get(e.districtId)) || "No district"}
+                          {plantTag(e.plantId) ? ` · ${plantTag(e.plantId)}` : ""}
                         </span>
                       </span>
                       <span className={`shrink-0 text-[11px] ${isStale ? "text-amber-600" : "text-neutral-400"}`}>
