@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -20,8 +21,8 @@ import { useDuty } from "../context/DutyContext";
 import { getCurrentPosition } from "../lib/locationTask";
 import type { Order, Product } from "../lib/types";
 import type { RootStackParamList } from "../navigation/types";
-import { Button, Card, Field, SectionLabel } from "../components/ui";
-import { colors, formatINR, radius } from "../theme";
+import { Button, Card, Field } from "../components/ui";
+import { colors, displayProductName, formatINR, radius } from "../theme";
 
 interface CartLine {
   variantId: string;
@@ -32,13 +33,14 @@ interface CartLine {
   quantity: number;
 }
 
+const MAX_RESULTS = 6;
+
 export default function NewOrderScreen() {
   const { onDuty, busy: dutyBusy, toggleDuty } = useDuty();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [code, setCode] = useState("");
-  const [looking, setLooking] = useState(false);
+  const [catalog, setCatalog] = useState<Product[] | null>(null);
+  const [query, setQuery] = useState("");
   const [found, setFound] = useState<Product | null>(null);
-  const [notFound, setNotFound] = useState(false);
   const [draftQty, setDraftQty] = useState<Record<string, number>>({});
   const [cart, setCart] = useState<CartLine[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -46,22 +48,35 @@ export default function NewOrderScreen() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [shopName, setShopName] = useState("");
   const [notes, setNotes] = useState("");
+  const scrollRef = useRef<ScrollView>(null);
+  const productsY = useRef(0);
+  // Bring the product search above the keyboard when it is tapped.
+  const revealProducts = () =>
+    setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, productsY.current - 8), animated: true }), 250);
 
-  async function handleLookup() {
-    const trimmed = code.trim();
-    if (!trimmed) return;
-    setLooking(true);
-    setFound(null);
-    setNotFound(false);
-    try {
-      const data = await api<{ product: Product }>(`/api/products/lookup/${encodeURIComponent(trimmed)}`);
-      setFound(data.product);
-      setDraftQty({});
-    } catch {
-      setNotFound(true);
-    } finally {
-      setLooking(false);
-    }
+  // The whole price list is small (a few dozen products), so load it once and
+  // search it on the phone: salespeople type part of a name, not a code.
+  useEffect(() => {
+    api<{ products: Product[] }>("/api/products")
+      .then((d) => setCatalog(d.products.filter((p) => p.variants.length > 0)))
+      .catch(() => setCatalog([]));
+  }, []);
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || !catalog) return [];
+    const exact = catalog.filter((p) => p.shortCode.toLowerCase() === q);
+    const rest = catalog.filter(
+      (p) => p.shortCode.toLowerCase() !== q && (p.name.toLowerCase().includes(q) || p.shortCode.toLowerCase().startsWith(q))
+    );
+    return [...exact, ...rest].slice(0, MAX_RESULTS);
+  }, [query, catalog]);
+
+  function pick(product: Product) {
+    Keyboard.dismiss();
+    setFound(product);
+    setDraftQty({});
+    setQuery("");
   }
 
   function addToCart() {
@@ -90,7 +105,6 @@ export default function NewOrderScreen() {
       return next;
     });
     setFound(null);
-    setCode("");
     setDraftQty({});
   }
 
@@ -104,14 +118,15 @@ export default function NewOrderScreen() {
 
   const total = useMemo(() => cart.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0), [cart]);
   const units = useMemo(() => cart.reduce((sum, l) => sum + l.quantity, 0), [cart]);
+  const draftCount = Object.values(draftQty).reduce((sum, q) => sum + q, 0);
 
   async function handleSubmit() {
     if (!customerName.trim()) {
-      Alert.alert("Missing info", "Customer name is required.");
+      Alert.alert("Customer name needed", "Enter who this order is for.");
       return;
     }
     if (cart.length === 0) {
-      Alert.alert("Missing info", "Add at least one product.");
+      Alert.alert("No products yet", "Add at least one product to the order.");
       return;
     }
 
@@ -133,7 +148,7 @@ export default function NewOrderScreen() {
       Alert.alert("Order placed", `${order.customerName} · ${formatINR(order.totalAmount)}`);
       navigation.goBack();
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to create order");
+      Alert.alert("Couldn't place the order", err instanceof Error ? err.message : "Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -156,100 +171,136 @@ export default function NewOrderScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <SectionLabel>Customer</SectionLabel>
-          <Card style={styles.section}>
-            <Field icon="person-outline" placeholder="Customer name *" value={customerName} onChangeText={setCustomerName} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <Step number={1} title="Customer" />
+          <Card style={styles.card}>
+            <Field label="Customer name" placeholder="Who is the order for?" value={customerName} onChangeText={setCustomerName} />
             <Field
-              icon="call-outline"
-              placeholder="Phone (optional)"
-              keyboardType="phone-pad"
+              label="Mobile number (optional)"
+              placeholder="98765 43210"
+              keyboardType="number-pad"
+              maxLength={10}
               value={customerPhone}
-              onChangeText={setCustomerPhone}
+              onChangeText={(t) => setCustomerPhone(t.replace(/\D/g, ""))}
             />
-            <Field icon="storefront-outline" placeholder="Shop name (optional)" value={shopName} onChangeText={setShopName} />
-            <Field icon="create-outline" placeholder="Notes (optional)" value={notes} onChangeText={setNotes} />
+            <Field label="Shop (optional)" placeholder="e.g. Sri Murugan Paints" value={shopName} onChangeText={setShopName} />
+            <Field label="Notes (optional)" placeholder="Delivery date, credit terms…" value={notes} onChangeText={setNotes} />
           </Card>
 
-          <SectionLabel>Add products</SectionLabel>
-          <Card style={styles.section}>
-            <View style={styles.codeRow}>
-              <View style={{ flex: 1 }}>
-                <Field
-                  icon="search-outline"
-                  placeholder="Product code, e.g. RPE"
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  value={code}
-                  onChangeText={(t) => {
-                    setCode(t);
-                    setNotFound(false);
-                  }}
-                  onSubmitEditing={handleLookup}
-                  returnKeyType="search"
-                />
-              </View>
-              <TouchableOpacity style={styles.findButton} onPress={handleLookup} disabled={looking || !code.trim()}>
-                {looking ? <ActivityIndicator color="#fff" /> : <Text style={styles.findText}>Find</Text>}
-              </TouchableOpacity>
-            </View>
-
-            {notFound ? (
-              <View style={styles.notFound}>
-                <Ionicons name="alert-circle-outline" size={18} color={colors.danger} />
-                <Text style={styles.notFoundText}>No active product with that code. Check the Price List tab.</Text>
-              </View>
-            ) : null}
-
+          <View onLayout={(e) => (productsY.current = e.nativeEvent.layout.y)}>
+            <Step number={2} title="Products" />
+          </View>
+          <Card style={styles.card}>
             {found ? (
-              <View style={styles.found}>
+              <View style={{ gap: 4 }}>
                 <View style={styles.foundHeader}>
-                  <Text style={styles.foundName}>{found.name}</Text>
-                  <Text style={styles.code}>{found.shortCode}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.foundName}>{displayProductName(found.name)}</Text>
+                    <Text style={styles.foundCode}>
+                      {found.shortCode} · {found.category}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setFound(null)} hitSlop={10} accessibilityLabel="Choose another product">
+                    <Ionicons name="close" size={22} color={colors.textMuted} />
+                  </TouchableOpacity>
                 </View>
                 {found.variants.map((v) => (
                   <View key={v.id} style={styles.sizeRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.sizeLabel}>{v.sizeLabel}</Text>
+                      <Text style={styles.sizeLabel}>{v.sizeLabel === "STD" ? "Standard pack" : v.sizeLabel}</Text>
                       <Text style={v.price > 0 ? styles.sizePrice : styles.noPrice}>
                         {v.price > 0 ? formatINR(v.price) : "Price not set"}
                       </Text>
                     </View>
                     {/* The server refuses unpriced sizes; ask the office rather than send a ₹0 order. */}
                     {v.price > 0 ? (
-                      <Stepper
-                        value={draftQty[v.id] ?? 0}
-                        onChange={(q) => setDraftQty((prev) => ({ ...prev, [v.id]: q }))}
-                      />
+                      <Stepper value={draftQty[v.id] ?? 0} onChange={(q) => setDraftQty((prev) => ({ ...prev, [v.id]: q }))} />
                     ) : (
                       <Text style={styles.askOffice}>{"Ask office\nto set price"}</Text>
                     )}
                   </View>
                 ))}
-                <Button label="Add to order" icon="cart-outline" variant="success" onPress={addToCart} />
+                <Button
+                  label={draftCount ? `Add ${draftCount} ${draftCount === 1 ? "pack" : "packs"} to order` : "Add to order"}
+                  icon="add"
+                  onPress={addToCart}
+                  disabled={!draftCount}
+                  style={{ marginTop: 10 }}
+                />
               </View>
-            ) : null}
+            ) : (
+              <>
+                <Field
+                  icon="search-outline"
+                  placeholder="Search product name or code"
+                  autoCorrect={false}
+                  value={query}
+                  onChangeText={setQuery}
+                  onFocus={revealProducts}
+                  returnKeyType="search"
+                  onSubmitEditing={() => matches[0] && pick(matches[0])}
+                />
+                {catalog === null ? <ActivityIndicator color={colors.textMuted} /> : null}
+                {query.trim() && catalog && matches.length === 0 ? (
+                  <Text style={styles.noMatch}>No product matches “{query.trim()}”. Check the Price List tab.</Text>
+                ) : null}
+                {matches.length > 0 ? (
+                  <View style={styles.results}>
+                    {matches.map((p, i) => {
+                      const prices = p.variants.filter((v) => v.price > 0).map((v) => v.price);
+                      return (
+                        <TouchableOpacity
+                          key={p.id}
+                          style={[styles.result, i > 0 && styles.resultDivider]}
+                          onPress={() => pick(p)}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.resultName} numberOfLines={1}>
+                              {displayProductName(p.name)}
+                            </Text>
+                            <Text style={styles.resultMeta}>
+                              {p.shortCode} · {p.variants.map((v) => v.sizeLabel).join(", ")}
+                              {prices.length ? `  ·  from ${formatINR(Math.min(...prices))}` : ""}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : null}
+                {!query.trim() && cart.length === 0 ? (
+                  <Text style={styles.hint}>Type part of a name (e.g. “premium”) or a product code (e.g. RPE).</Text>
+                ) : null}
+              </>
+            )}
           </Card>
 
           {cart.length > 0 ? (
             <>
-              <SectionLabel>Order items</SectionLabel>
-              <Card style={{ paddingVertical: 4 }}>
+              <Step number={3} title="Review" />
+              <Card style={styles.summary}>
                 {cart.map((l, i) => (
                   <View key={l.variantId} style={[styles.cartRow, i > 0 && styles.cartDivider]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cartName} numberOfLines={1}>
-                        {l.productName}
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.cartName} numberOfLines={2}>
+                        {displayProductName(l.productName)}
                       </Text>
                       <Text style={styles.cartMeta}>
-                        {l.shortCode} · {l.sizeLabel} · {formatINR(l.unitPrice)} each
+                        {l.sizeLabel === "STD" ? "Standard pack" : l.sizeLabel} · {formatINR(l.unitPrice)} each
                       </Text>
                       <Text style={styles.cartLineTotal}>{formatINR(l.unitPrice * l.quantity)}</Text>
                     </View>
                     <Stepper value={l.quantity} onChange={(q) => setLineQty(l.variantId, q)} removable />
                   </View>
                 ))}
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>
+                    Total · {units} {units === 1 ? "pack" : "packs"}
+                  </Text>
+                  <Text style={styles.totalValue}>{formatINR(total)}</Text>
+                </View>
               </Card>
             </>
           ) : null}
@@ -258,21 +309,32 @@ export default function NewOrderScreen() {
         <View style={styles.footer}>
           <View style={{ flex: 1 }}>
             <Text style={styles.footerLabel}>
-              {units} {units === 1 ? "unit" : "units"}
+              {cart.length ? `${cart.length} ${cart.length === 1 ? "item" : "items"} · ${units} packs` : "No items yet"}
             </Text>
             <Text style={styles.footerTotal}>{formatINR(total)}</Text>
           </View>
           <Button
             label="Place order"
-            icon="checkmark-circle"
+            icon="checkmark"
             onPress={handleSubmit}
             loading={submitting}
-            disabled={cart.length === 0}
-            style={{ flex: 1.3 }}
+            disabled={cart.length === 0 || !customerName.trim()}
+            style={{ flex: 1.2 }}
           />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function Step({ number, title }: { number: number; title: string }) {
+  return (
+    <View style={styles.step}>
+      <View style={styles.stepNumber}>
+        <Text style={styles.stepNumberText}>{number}</Text>
+      </View>
+      <Text style={styles.stepTitle}>{title}</Text>
+    </View>
   );
 }
 
@@ -288,14 +350,10 @@ function Stepper({
 }) {
   return (
     <View style={styles.stepper}>
-      <TouchableOpacity
-        style={styles.stepBtn}
-        onPress={() => onChange(Math.max(0, value - 1))}
-        accessibilityLabel="Decrease"
-      >
+      <TouchableOpacity style={styles.stepBtn} onPress={() => onChange(Math.max(0, value - 1))} accessibilityLabel="Decrease">
         <Ionicons
           name={removable && value <= 1 ? "trash-outline" : "remove"}
-          size={20}
+          size={18}
           color={removable && value <= 1 ? colors.danger : colors.text}
         />
       </TouchableOpacity>
@@ -308,7 +366,7 @@ function Stepper({
         onChangeText={(t) => onChange(Number(t.replace(/[^0-9]/g, "") || 0))}
       />
       <TouchableOpacity style={styles.stepBtn} onPress={() => onChange(value + 1)} accessibilityLabel="Increase">
-        <Ionicons name="add" size={20} color={colors.text} />
+        <Ionicons name="add" size={18} color={colors.text} />
       </TouchableOpacity>
     </View>
   );
@@ -319,52 +377,68 @@ const styles = StyleSheet.create({
   offDutyTitle: { fontSize: 20, fontWeight: "700", color: colors.text },
   offDutyText: { fontSize: 15, color: colors.textMuted, textAlign: "center", marginBottom: 12 },
   safe: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
-  section: { gap: 12 },
-  codeRow: { flexDirection: "row", gap: 10, alignItems: "flex-end" },
-  findButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    height: 50,
-    paddingHorizontal: 20,
-    justifyContent: "center",
+  content: { padding: 20, gap: 12, paddingBottom: 32 },
+  step: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8 },
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.text,
     alignItems: "center",
+    justifyContent: "center",
   },
-  findText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  notFound: { flexDirection: "row", gap: 8, alignItems: "center" },
-  notFoundText: { color: colors.danger, fontSize: 13, flex: 1 },
-  found: { gap: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
-  foundHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  stepNumberText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  stepTitle: { fontSize: 15, fontWeight: "700", color: colors.text },
+  card: { gap: 14, padding: 18 },
+  hint: { fontSize: 13, color: colors.textMuted, lineHeight: 19 },
+  noMatch: { fontSize: 13, color: colors.textMuted },
+  results: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" },
+  result: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14 },
+  resultDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  resultName: { fontSize: 15, fontWeight: "600", color: colors.text },
+  resultMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  foundHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 6 },
+  foundName: { fontSize: 17, fontWeight: "700", color: colors.text },
+  foundCode: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  sizeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  sizeLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
+  sizePrice: { fontSize: 13, color: colors.textMuted, marginTop: 1 },
+  noPrice: { fontSize: 12, color: colors.textFaint },
   askOffice: { fontSize: 12, color: colors.textMuted, textAlign: "right", fontWeight: "600" },
-  foundName: { fontSize: 16, fontWeight: "700", color: colors.text, flexShrink: 1 },
-  code: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.primary,
-    backgroundColor: colors.primarySoft,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  sizeRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  sizeLabel: { fontSize: 15, fontWeight: "700", color: colors.text },
-  sizePrice: { fontSize: 13, color: colors.textMuted },
-  noPrice: { fontSize: 12, color: colors.textFaint, fontStyle: "italic" },
   stepper: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     overflow: "hidden",
+    backgroundColor: colors.surface,
   },
-  stepBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
-  stepValue: { width: 48, textAlign: "center", fontSize: 16, fontWeight: "700", color: colors.text, paddingVertical: 0 },
-  cartRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
+  stepBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
+  stepValue: { width: 44, textAlign: "center", fontSize: 16, fontWeight: "700", color: colors.text, paddingVertical: 0 },
+  summary: { paddingVertical: 4, paddingHorizontal: 18 },
+  cartRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14 },
   cartDivider: { borderTopWidth: 1, borderTopColor: colors.border },
-  cartName: { fontSize: 15, fontWeight: "700", color: colors.text },
-  cartMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  cartLineTotal: { fontSize: 14, fontWeight: "700", color: colors.text, marginTop: 4 },
+  cartName: { fontSize: 15, fontWeight: "600", color: colors.text },
+  cartMeta: { fontSize: 12, color: colors.textMuted },
+  cartLineTotal: { fontSize: 14, fontWeight: "700", color: colors.text, marginTop: 2 },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderStrong,
+  },
+  totalLabel: { fontSize: 14, fontWeight: "600", color: colors.textMuted },
+  totalValue: { fontSize: 18, fontWeight: "700", color: colors.text },
   footer: {
     flexDirection: "row",
     alignItems: "center",
@@ -372,9 +446,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 12,
   },
   footerLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
-  footerTotal: { fontSize: 22, fontWeight: "800", color: colors.text },
+  footerTotal: { fontSize: 22, fontWeight: "700", color: colors.text },
 });
