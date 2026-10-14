@@ -234,3 +234,31 @@ describe("order and report logic", () => {
     expect(res.body.orderStatusBreakdown).toContainEqual({ status: "cancelled", count: 1 });
   });
 });
+
+describe("an employee's own duty status", () => {
+  let f: Fixtures;
+  let empA: string;
+  beforeEach(async () => {
+    await resetDb();
+    f = await seedFixtures();
+    empA = (await login("9000000001")).accessToken;
+    ensureSocket();
+  });
+
+  it("reports on-duty since the open session started, and today's minutes", async () => {
+    await api().post("/api/tracking/duty").set(bearer(empA)).send({ onDuty: true, lat: 13, lng: 80 });
+    const started = new Date(Date.now() - 40 * 60 * 1000);
+    await prisma.dutySession.updateMany({ where: { userId: f.empA.id }, data: { startedAt: started } });
+
+    const res = await api().get("/api/tracking/me").set(bearer(empA));
+    expect(res.status).toBe(200);
+    expect(res.body.onDuty).toBe(true);
+    expect(new Date(res.body.since).getTime()).toBe(started.getTime());
+    expect(res.body.minutesToday).toBeGreaterThanOrEqual(39);
+  });
+
+  it("is off duty with no start time before going on duty", async () => {
+    const res = await api().get("/api/tracking/me").set(bearer(empA));
+    expect(res.body).toEqual({ onDuty: false, since: null, minutesToday: 0 });
+  });
+});

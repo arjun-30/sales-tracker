@@ -42,7 +42,7 @@ function greeting() {
 
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { onDuty, busy, toggleDuty } = useDuty();
   const [stats, setStats] = useState<TodayStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,38 +83,6 @@ export default function HomeScreen() {
     navigation.navigate("NewOrder");
   }
 
-  // Ending duty stops the working-hours clock, so it lives behind the menu and
-  // a confirmation rather than as a button that can be tapped by accident.
-  function confirmEndDuty() {
-    Alert.alert(
-      "End duty for today?",
-      "Your working hours stop counting from now and the office will see you as off duty.",
-      [
-        { text: "Keep working", style: "cancel" },
-        { text: "End duty", style: "destructive", onPress: toggleDuty },
-      ]
-    );
-  }
-
-  function openMenu() {
-    if (onDuty) {
-      Alert.alert(user?.name ?? "Account", user?.employeeCode ?? undefined, [
-        { text: "End duty", onPress: confirmEndDuty },
-        {
-          text: "Log out",
-          // Logging out would stop tracking without ending the shift properly.
-          onPress: () => Alert.alert("You're on duty", "End duty before logging out."),
-        },
-        { text: "Close", style: "cancel" },
-      ]);
-    } else {
-      Alert.alert(user?.name ?? "Account", user?.employeeCode ?? undefined, [
-        { text: "Log out", onPress: logout },
-        { text: "Close", style: "cancel" },
-      ]);
-    }
-  }
-
   const initials = (user?.name ?? "?")
     .split(" ")
     .filter(Boolean)
@@ -141,7 +109,7 @@ export default function HomeScreen() {
       >
         <View style={styles.headerTop}>
           <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
-          <TouchableOpacity style={styles.avatar} onPress={openMenu} accessibilityLabel="Account menu">
+          <TouchableOpacity style={styles.avatar} onPress={() => navigation.navigate("Profile")} accessibilityLabel="Profile">
             <Text style={styles.avatarText}>{initials}</Text>
           </TouchableOpacity>
         </View>

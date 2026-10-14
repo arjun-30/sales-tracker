@@ -1,6 +1,7 @@
 export type RootStackParamList = {
   Tabs: undefined;
   NewOrder: undefined;
+  Profile: undefined;
 };
 
 export type TabParamList = {

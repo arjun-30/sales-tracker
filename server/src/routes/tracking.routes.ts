@@ -4,6 +4,7 @@ import { prisma } from "../db";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { getIO } from "../socket";
 import { closeDuty, startDutySession } from "../lib/duty";
+import { istStartOfDay, totalMinutes, workedByDay } from "../lib/attendance";
 
 export const trackingRouter = Router();
 
@@ -112,4 +113,25 @@ trackingRouter.get("/live", requireRole("admin"), async (_req, res) => {
     include: { user: { select: { id: true, name: true, districtId: true, district: true } } },
   });
   res.json({ locations });
+});
+
+// The employee's own duty status for the app's profile screen: whether they
+// are on duty, since when, and how long they have worked today (IST day).
+trackingRouter.get("/me", requireRole("sales_employee"), async (req, res) => {
+  const userId = req.user!.sub;
+  const now = new Date();
+  const todayStart = istStartOfDay(now);
+  const [location, sessions] = await Promise.all([
+    prisma.employeeLocation.findUnique({ where: { userId }, select: { onDuty: true } }),
+    prisma.dutySession.findMany({
+      where: { userId, startedAt: { lt: now }, OR: [{ endedAt: null }, { endedAt: { gt: todayStart } }] },
+      orderBy: { startedAt: "asc" },
+    }),
+  ]);
+  const open = sessions.find((s) => s.endedAt === null);
+  res.json({
+    onDuty: location?.onDuty ?? false,
+    since: location?.onDuty ? (open?.startedAt ?? null) : null,
+    minutesToday: totalMinutes(workedByDay(sessions, todayStart, now, now)),
+  });
 });

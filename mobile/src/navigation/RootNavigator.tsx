@@ -14,6 +14,7 @@ import OrdersScreen from "../screens/OrdersScreen";
 import NewOrderScreen from "../screens/NewOrderScreen";
 import VisitsScreen from "../screens/VisitsScreen";
 import CatalogScreen from "../screens/CatalogScreen";
+import ProfileScreen from "../screens/ProfileScreen";
 import type { RootStackParamList, TabParamList } from "./types";
 import { colors } from "../theme";
 
@@ -90,6 +91,7 @@ export default function RootNavigator() {
           <Stack.Navigator screenOptions={headerStyle}>
             <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
             <Stack.Screen name="NewOrder" component={NewOrderScreen} options={{ title: "New Order" }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
           </Stack.Navigator>
         </DutyProvider>
       ) : (
