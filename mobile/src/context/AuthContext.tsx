@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api, clearTokens, getAccessToken, setTokens } from "../lib/api";
+import * as SecureStore from "expo-secure-store";
+import { api, ApiError, clearTokens, getAccessToken, SessionExpiredError, setTokens } from "../lib/api";
 import { isBackgroundLocationRunning, stopBackgroundLocationUpdates } from "../lib/locationTask";
 import type { User } from "../lib/types";
 
@@ -11,6 +12,22 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+// The last profile the server returned, so a phone with a valid login but no
+// signal at the moment the app opens stays logged in instead of bouncing to
+// the login screen.
+const USER_KEY = "pt_user";
+
+async function cachedUser(): Promise<User | null> {
+  const raw = await SecureStore.getItemAsync(USER_KEY);
+  try {
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
+}
+
+const rememberUser = (user: User) => SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -26,8 +43,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await api<{ user: User }>("/api/auth/me");
       setUser(data.user);
-    } catch {
-      setUser(null);
+      await rememberUser(data.user);
+    } catch (err) {
+      const rejected =
+        err instanceof SessionExpiredError || (err instanceof ApiError && (err.status === 401 || err.status === 403));
+      if (rejected) {
+        await SecureStore.deleteItemAsync(USER_KEY);
+        setUser(null);
+      } else {
+        // Network trouble, not a bad login: carry on with what we knew.
+        setUser(await cachedUser());
+      }
     } finally {
       setLoading(false);
     }
@@ -43,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       { method: "POST", body: JSON.stringify({ phone, password }) }
     );
     await setTokens(data.accessToken, data.refreshToken);
+    await rememberUser(data.user);
     setUser(data.user);
   }, []);
 
@@ -54,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
     await clearTokens();
+    await SecureStore.deleteItemAsync(USER_KEY);
     setUser(null);
   }, []);
 
