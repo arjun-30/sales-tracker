@@ -56,3 +56,14 @@ export function formatDuration(fromIso: string, toIso?: string | null) {
   if (mins < 60) return `${mins} min`;
   return `${Math.floor(mins / 60)} h ${mins % 60} min`;
 }
+
+// "ROALUX WATERBASE PRIMER(EXTERIOR)" → "Roalux Waterbase Primer (Exterior)".
+// Catalogue names are stored in capitals; this is display only.
+export function displayProductName(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/\(/g, " (")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/(^|[\s(])([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
+}

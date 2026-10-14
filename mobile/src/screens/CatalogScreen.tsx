@@ -14,20 +14,9 @@ import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../lib/api";
 import type { Product } from "../lib/types";
 import { EmptyState, Loading } from "../components/ui";
-import { colors, formatINR, radius } from "../theme";
+import { colors, displayProductName, formatINR, radius } from "../theme";
 
 const ALL = "All";
-
-// "ROALUX WATERBASE PRIMER(EXTERIOR)" → "Roalux Waterbase Primer (Exterior)".
-// Catalogue names are stored in capitals; this is display only.
-function displayName(name: string) {
-  return name
-    .toLowerCase()
-    .replace(/\(/g, " (")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/(^|[\s(])([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
-}
 
 export default function CatalogScreen() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -153,7 +142,7 @@ export default function CatalogScreen() {
             <View style={[styles.cardHeader, single && { paddingBottom: 12 }]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name} numberOfLines={2}>
-                  {displayName(item.name)}
+                  {displayProductName(item.name)}
                 </Text>
                 {single ? (
                   <Text style={styles.code}>
