@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../lib/api";
 import type { Order } from "../lib/types";
 import type { RootStackParamList } from "../navigation/types";
-import { Card, EmptyState, Loading, StatusPill } from "../components/ui";
+import { Card, EmptyState, Loading, OrderStatus } from "../components/ui";
 import { colors, formatDateTime, formatINR, radius } from "../theme";
 
 export default function OrdersScreen() {
@@ -73,7 +73,7 @@ export default function OrdersScreen() {
                 {units} {units === 1 ? "unit" : "units"} · {products.join(", ")}
               </Text>
               <View style={styles.row}>
-                <StatusPill status={item.status} />
+                <OrderStatus status={item.status} />
                 <Text style={styles.date}>{formatDateTime(item.createdAt)}</Text>
               </View>
             </Card>
@@ -81,7 +81,7 @@ export default function OrdersScreen() {
         }}
       />
       <TouchableOpacity activeOpacity={0.85} style={styles.fab} onPress={() => navigation.navigate("NewOrder")}>
-        <Ionicons name="add" size={24} color="#fff" />
+        <Ionicons name="bag-add-outline" size={20} color="#fff" />
         <Text style={styles.fabText}>New order</Text>
       </TouchableOpacity>
     </View>
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 15,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     elevation: 4,
   },
   fabText: { color: "#fff", fontWeight: "700", fontSize: 15 },

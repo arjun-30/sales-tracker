@@ -81,12 +81,12 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
   return <Text style={styles.sectionLabel}>{children}</Text>;
 }
 
-export function StatusPill({ status }: { status: keyof typeof statusTone }) {
+export function OrderStatus({ status }: { status: keyof typeof statusTone }) {
   const tone = statusTone[status];
   return (
-    <View style={[styles.pill, { backgroundColor: tone.bg }]}>
-      <View style={[styles.pillDot, { backgroundColor: tone.fg }]} />
-      <Text style={[styles.pillText, { color: tone.fg }]}>{tone.label}</Text>
+    <View style={styles.status}>
+      <Ionicons name={tone.icon} size={16} color={tone.fg} />
+      <Text style={[styles.statusText, { color: tone.fg }]}>{tone.label}</Text>
     </View>
   );
 }
@@ -150,17 +150,8 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    alignSelf: "flex-start",
-  },
-  pillDot: { width: 6, height: 6, borderRadius: 3 },
-  pillText: { fontSize: 12, fontWeight: "700" },
+  status: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start" },
+  statusText: { fontSize: 13, fontWeight: "600" },
   empty: { alignItems: "center", paddingVertical: 48, paddingHorizontal: 24, gap: 8 },
   emptyIcon: {
     width: 56,

@@ -25,11 +25,13 @@ export const colors = {
 
 export const radius = { sm: 8, md: 12, lg: 16, pill: 999 };
 
+// Order status as an icon and a word: a clock while waiting, one tick once the
+// office confirms, two ticks when delivered, a cross if cancelled.
 export const statusTone = {
-  pending: { fg: colors.warning, bg: colors.warningSoft, label: "Pending" },
-  confirmed: { fg: "#0369a1", bg: "#f0f9ff", label: "Confirmed" },
-  delivered: { fg: colors.success, bg: colors.successSoft, label: "Delivered" },
-  cancelled: { fg: colors.danger, bg: colors.dangerSoft, label: "Cancelled" },
+  pending: { fg: colors.warning, icon: "time-outline", label: "Pending" },
+  confirmed: { fg: "#0369a1", icon: "checkmark-outline", label: "Confirmed" },
+  delivered: { fg: colors.success, icon: "checkmark-done-outline", label: "Delivered" },
+  cancelled: { fg: colors.danger, icon: "close-circle-outline", label: "Cancelled" },
 } as const;
 
 export function formatINR(amount: number) {
