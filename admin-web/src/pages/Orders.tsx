@@ -1,19 +1,12 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { api } from "../lib/api";
-import { formatDate, formatINR, formatTime } from "../lib/format";
+import { displayProductName, formatDate, formatINR, formatTime } from "../lib/format";
 import type { District, Order, OrderStatus } from "../lib/types";
-import { Card, Notice, PageHeader, Status, Tabs, type StatusTone } from "../components/ui/Card";
+import { Card, Notice, OrderStatusLabel, PageHeader, Tabs } from "../components/ui/Card";
 import { Input, Select } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { MessageRow, Table, Td, Th, Tr } from "../components/ui/Table";
-
-const STATUS: Record<OrderStatus, { label: string; tone: StatusTone }> = {
-  pending: { label: "Pending", tone: "amber" },
-  confirmed: { label: "Confirmed", tone: "blue" },
-  delivered: { label: "Delivered", tone: "green" },
-  cancelled: { label: "Cancelled", tone: "red" },
-};
 
 // Mirrors ALLOWED_TRANSITIONS in server/src/routes/orders.routes.ts; the server enforces it.
 const actionsByStatus: Record<OrderStatus, { to: OrderStatus; label: string }[]> = {
@@ -178,7 +171,7 @@ export function Orders() {
                       <Td className="max-w-[230px]">
                         {first ? (
                           <div className="truncate text-neutral-800">
-                            {first.variant.product.name} <span className="text-neutral-500">{first.variant.sizeLabel}</span> ×{" "}
+                            {displayProductName(first.variant.product.name)} <span className="text-neutral-500">{first.variant.sizeLabel}</span> ×{" "}
                             {first.quantity}
                           </div>
                         ) : null}
@@ -199,7 +192,7 @@ export function Orders() {
                         {o.totalAmount > 0 ? formatINR(o.totalAmount) : <span className="text-red-600">₹0</span>}
                       </Td>
                       <Td>
-                        <Status tone={STATUS[o.status].tone}>{STATUS[o.status].label}</Status>
+                        <OrderStatusLabel status={o.status} />
                       </Td>
                       <Td className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">
@@ -254,7 +247,7 @@ function OrderDetail({ order }: { order: Order }) {
             {order.items.map((i) => (
               <tr key={i.id} className="border-t border-neutral-100">
                 <td className="px-4 py-2 text-neutral-800">
-                  {i.variant.product.name}
+                  {displayProductName(i.variant.product.name)}
                   <span className="ml-2 font-mono text-xs text-neutral-400">{i.variant.product.shortCode}</span>
                 </td>
                 <td className="px-4 py-2 text-neutral-600">{i.variant.sizeLabel}</td>

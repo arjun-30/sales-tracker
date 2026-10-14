@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, IndianRupee, Receipt, Store, UserCheck } from "lucide-react";
+import { CalendarDays, Clock, IndianRupee, Receipt, Store, UserCheck } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -17,7 +17,7 @@ import {
 } from "recharts";
 import { api } from "../lib/api";
 import type { District, ReportSummary } from "../lib/types";
-import { Card, CardHeader, PageHeader, Segmented, StatCard, Status } from "../components/ui/Card";
+import { Card, CardHeader, PageHeader, Segmented, StatCard } from "../components/ui/Card";
 import { Select } from "../components/ui/Input";
 
 // Primary series in cobalt, warm brown for the second; categories get distinct hues.
@@ -361,7 +361,10 @@ export function Dashboard() {
                   <td className="px-5 py-3">{o.employeeName}</td>
                   <td className="px-5 py-3 tabular-nums">{formatCurrency(o.totalAmount)}</td>
                   <td className="px-5 py-3">
-                    <Status tone={o.isStuck ? "red" : "amber"}>{ageLabel(o.createdAt)}</Status>
+                    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium ${o.isStuck ? "text-red-600" : "text-amber-600"}`}>
+                      <Clock className="h-4 w-4" strokeWidth={2.25} />
+                      {ageLabel(o.createdAt)}
+                    </span>
                   </td>
                 </tr>
               ))}

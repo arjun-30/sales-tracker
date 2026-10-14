@@ -38,3 +38,14 @@ export function timeAgo(iso: string, now = Date.now()): string {
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
 }
+
+// "ROALUX WATERBASE PRIMER(EXTERIOR)" → "Roalux Waterbase Primer (Exterior)".
+// Catalogue names are stored in capitals; this is display only (matches the app).
+export function displayProductName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\(/g, " (")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/(^|[\s(])([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
+}

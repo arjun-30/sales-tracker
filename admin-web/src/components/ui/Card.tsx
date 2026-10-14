@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { Check, CheckCheck, Clock, XCircle } from "lucide-react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`rounded-lg border border-neutral-200 bg-white ${className}`}>{children}</div>;
@@ -154,5 +155,25 @@ export function Segmented<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+const orderStatus = {
+  pending: { label: "Pending", icon: Clock, color: "text-amber-600" },
+  confirmed: { label: "Confirmed", icon: Check, color: "text-sky-700" },
+  delivered: { label: "Delivered", icon: CheckCheck, color: "text-emerald-700" },
+  cancelled: { label: "Cancelled", icon: XCircle, color: "text-red-600" },
+} as const;
+
+// Order status as an icon and a word, the same as the sales app: a clock while
+// waiting, one tick once confirmed, two when delivered, a cross if cancelled.
+export function OrderStatusLabel({ status }: { status: keyof typeof orderStatus }) {
+  const s = orderStatus[status];
+  const Icon = s.icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium ${s.color}`}>
+      <Icon className="h-4 w-4 shrink-0" strokeWidth={2.25} />
+      {s.label}
+    </span>
   );
 }
