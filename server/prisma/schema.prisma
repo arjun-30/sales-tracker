@@ -7,9 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// super_admin sees every plant; admin runs one plant; sales_employee works
+// in the field for one plant.
 enum Role {
   admin
   sales_employee
+  super_admin
 }
 
 enum DutyEndReason {
@@ -37,20 +40,76 @@ model District {
   visits Visit[]
 }
 
+// A Roalux plant. Each has its own admins, salespeople, stores and prices.
+// `code` (CHN) is part of every employee code at the plant: RLX-CHN-001.
+model Plant {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users  User[]
+  orders Order[]
+  visits Visit[]
+  stores Store[]
+  prices PlantPrice[]
+}
+
+// A plant's own price for one product size. Sizes without one sell at the
+// company price on ProductVariant.
+model PlantPrice {
+  plantId   String
+  variantId String
+  price     Decimal  @db.Decimal(12, 2)
+  updatedAt DateTime @updatedAt
+
+  plant   Plant          @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@id([plantId, variantId])
+}
+
+// A shop or dealer the plant supplies, pinned on the admin map.
+model Store {
+  id          String   @id @default(cuid())
+  plantId     String
+  name        String
+  ownerName   String?
+  phone       String?
+  address     String?
+  lat         Float
+  lng         Float
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  plant     Plant @relation(fields: [plantId], references: [id])
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([plantId])
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
   phone        String   @unique
-  // Short staff ID (RLX001, RLX002, …) for sales employees; admins have none.
+  // Staff ID with the plant in it (RLX-CHN-001) for sales employees; admins have none.
   employeeCode String?  @unique
   passwordHash String
   role         Role
   districtId   String?
+  // Every admin and salesperson belongs to one plant; the super admin to none.
+  plantId      String?
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   district         District?         @relation(fields: [districtId], references: [id])
+  plant            Plant?            @relation(fields: [plantId], references: [id])
+  storesAdded      Store[]
   employeeLocation EmployeeLocation?
   locationHistory  LocationHistory[]
   orders           Order[]
@@ -120,36 +179,42 @@ model ProductVariant {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  orderItems OrderItem[]
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+  plantPrices PlantPrice[]
 
   @@unique([productId, sizeLabel])
 }
 
 model Order {
-  id           String      @id @default(cuid())
-  employeeId   String
-  districtId   String
-  customerName String
+  id            String      @id @default(cuid())
+  employeeId    String
+  districtId    String
+  // The salesperson's plant when the order was taken; a later transfer
+  // leaves it with the plant it was taken for.
+  plantId       String
+  customerName  String
   customerPhone String?
-  shopName     String?
-  totalAmount  Decimal     @db.Decimal(12, 2)
-  status       OrderStatus @default(pending)
-  notes        String?
-  lat          Float?
-  lng          Float?
-  createdAt    DateTime    @default(now())
+  shopName      String?
+  totalAmount   Decimal     @db.Decimal(12, 2)
+  status        OrderStatus @default(pending)
+  notes         String?
+  lat           Float?
+  lng           Float?
+  createdAt     DateTime    @default(now())
 
   employee User        @relation(fields: [employeeId], references: [id])
   district District    @relation(fields: [districtId], references: [id])
+  plant    Plant       @relation(fields: [plantId], references: [id])
   items    OrderItem[]
 
   @@index([employeeId, createdAt])
   @@index([districtId, createdAt])
+  @@index([plantId, createdAt])
 }
 
 model OrderItem {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   orderId   String
   variantId String
   quantity  Int
@@ -160,20 +225,23 @@ model OrderItem {
 }
 
 model Visit {
-  id            String    @id @default(cuid())
-  employeeId    String
-  districtId    String
-  shopName      String
-  checkInAt     DateTime  @default(now())
-  checkInLat    Float
-  checkInLng    Float
-  checkOutAt    DateTime?
-  checkOutLat   Float?
-  checkOutLng   Float?
-  notes         String?
+  id          String    @id @default(cuid())
+  employeeId  String
+  districtId  String
+  plantId     String
+  shopName    String
+  checkInAt   DateTime  @default(now())
+  checkInLat  Float
+  checkInLng  Float
+  checkOutAt  DateTime?
+  checkOutLat Float?
+  checkOutLng Float?
+  notes       String?
 
   employee User     @relation(fields: [employeeId], references: [id])
   district District @relation(fields: [districtId], references: [id])
+  plant    Plant    @relation(fields: [plantId], references: [id])
 
   @@index([employeeId, checkInAt])
+  @@index([plantId, checkInAt])
 }

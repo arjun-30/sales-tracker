@@ -64,17 +64,18 @@ describe("workedByDay", () => {
 
 describe("normalizeEmployeeCode", () => {
   it.each([
-    ["RLX001", "RLX001"],
-    ["rlx1", "RLX001"],
-    ["RLX-007", "RLX007"],
-    [" 12 ", "RLX012"],
-    ["RLX1234", "RLX1234"],
+    ["RLX-CHN-001", "RLX-CHN-001"],
+    ["rlx-chn-1", "RLX-CHN-001"],
+    ["RLXCHN007", "RLX-CHN-007"],
+    [" chn 12 ", "RLX-CHN-012"],
+    ["RLX-MDU-1234", "RLX-MDU-1234"],
   ])("%s → %s", (input, expected) => {
     expect(normalizeEmployeeCode(input)).toBe(expected);
   });
 
   it("rejects things that are not codes", () => {
-    expect(normalizeEmployeeCode("ABC001")).toBeNull();
+    expect(normalizeEmployeeCode("12")).toBeNull();
+    expect(normalizeEmployeeCode("CHN")).toBeNull();
     expect(normalizeEmployeeCode("")).toBeNull();
   });
 });
@@ -149,11 +150,11 @@ describe("duty sessions and attendance", () => {
     });
 
     const res = await api()
-      .get("/api/employees/code/rlx1/attendance")
+      .get("/api/employees/code/chn1/attendance")
       .query({ from: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(), to: now.toISOString() })
       .set(bearer(admin));
     expect(res.status).toBe(200);
-    expect(res.body.employee).toMatchObject({ employeeCode: "RLX001", name: "Emp A" });
+    expect(res.body.employee).toMatchObject({ employeeCode: "RLX-CHN-001", name: "Emp A" });
     expect(res.body.sessions).toHaveLength(2);
     // 2h closed + ~30 min open; allow a minute either way for test timing.
     expect(res.body.totalMinutes).toBeGreaterThanOrEqual(149);
@@ -162,25 +163,25 @@ describe("duty sessions and attendance", () => {
   });
 
   it("an unknown or malformed code is a clear error", async () => {
-    const missing = await api().get("/api/employees/code/RLX999/attendance").set(bearer(admin));
+    const missing = await api().get("/api/employees/code/RLX-CHN-999/attendance").set(bearer(admin));
     expect(missing.status).toBe(404);
-    expect(missing.body.error).toContain("RLX999");
+    expect(missing.body.error).toContain("RLX-CHN-999");
     const bad = await api().get("/api/employees/code/hello/attendance").set(bearer(admin));
     expect(bad.status).toBe(400);
   });
 
   it("sales employees cannot look up attendance", async () => {
-    const res = await api().get("/api/employees/code/RLX001/attendance").set(bearer(empA));
+    const res = await api().get("/api/employees/code/RLX-CHN-001/attendance").set(bearer(empA));
     expect(res.status).toBe(403);
   });
 
-  it("a new employee gets the next free code", async () => {
+  it("a new employee gets the next free code at their plant", async () => {
     const res = await api()
       .post("/api/employees")
       .set(bearer(admin))
-      .send({ name: "New Rep", phone: "9000000003", password: "abcd", districtId: f.chennai.id });
+      .send({ name: "New Rep", phone: "9000000003", password: "abcd", districtId: f.chennai.id, plantId: f.plantA.id });
     expect(res.status).toBe(201);
-    expect(res.body.employee.employeeCode).toBe("RLX003");
+    expect(res.body.employee.employeeCode).toBe("RLX-CHN-002");
   });
 
   it("the employee list shows codes and today's minutes", async () => {
@@ -189,7 +190,7 @@ describe("duty sessions and attendance", () => {
     });
     const res = await api().get("/api/employees").set(bearer(admin));
     const a = res.body.employees.find((e: { id: string }) => e.id === f.empA.id);
-    expect(a.employeeCode).toBe("RLX001");
+    expect(a.employeeCode).toBe("RLX-CHN-001");
     expect(a.minutesToday).toBeGreaterThanOrEqual(44);
   });
 });

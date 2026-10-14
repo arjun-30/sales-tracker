@@ -20,7 +20,10 @@ authRouter.post("/login", loginPerIpLimiter, loginPerPhoneLimiter, async (req, r
   }
   const { phone, password } = parsed.data;
 
-  const user = await prisma.user.findUnique({ where: { phone } });
+  const user = await prisma.user.findUnique({
+    where: { phone },
+    include: { plant: { select: { id: true, name: true, code: true } } },
+  });
   if (!user || !user.active) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
@@ -43,6 +46,8 @@ authRouter.post("/login", loginPerIpLimiter, loginPerPhoneLimiter, async (req, r
       employeeCode: user.employeeCode,
       role: user.role,
       districtId: user.districtId,
+      plantId: user.plantId,
+      plant: user.plant,
     },
   });
 });
@@ -70,7 +75,17 @@ authRouter.post("/refresh", async (req, res) => {
 authRouter.get("/me", requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.sub },
-    select: { id: true, name: true, phone: true, employeeCode: true, role: true, districtId: true, district: true },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      employeeCode: true,
+      role: true,
+      districtId: true,
+      district: true,
+      plantId: true,
+      plant: { select: { id: true, name: true, code: true } },
+    },
   });
   if (!user) return res.status(404).json({ error: "User not found" });
   res.json({ user });

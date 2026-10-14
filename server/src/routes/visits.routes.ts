@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
 import { requireAuth, requireRole } from "../middleware/auth";
+import { plantFilter } from "../lib/scope";
 
 export const visitsRouter = Router();
 
@@ -35,6 +36,9 @@ visitsRouter.post("/checkin", requireRole("sales_employee"), async (req, res) =>
   if (!employee?.districtId) {
     return res.status(400).json({ error: "Employee has no district assigned" });
   }
+  if (!employee.plantId) {
+    return res.status(400).json({ error: "Employee has no plant assigned" });
+  }
   // Visits count towards the working day, so they only happen on duty.
   if (!employee.employeeLocation?.onDuty) {
     return res.status(409).json({ error: "Go on duty before checking in to a shop." });
@@ -45,6 +49,7 @@ visitsRouter.post("/checkin", requireRole("sales_employee"), async (req, res) =>
     data: {
       employeeId,
       districtId: employee.districtId,
+      plantId: employee.plantId,
       shopName,
       checkInLat: lat,
       checkInLng: lng,
@@ -98,8 +103,9 @@ visitsRouter.get("/", async (req, res) => {
   const where: Record<string, unknown> = {};
   if (req.user!.role === "sales_employee") {
     where.employeeId = req.user!.sub;
-  } else if (employeeId) {
-    where.employeeId = employeeId;
+  } else {
+    Object.assign(where, plantFilter(req));
+    if (employeeId) where.employeeId = employeeId;
   }
   if (districtId) where.districtId = districtId;
   if (from || to) {
@@ -111,7 +117,11 @@ visitsRouter.get("/", async (req, res) => {
 
   const visits = await prisma.visit.findMany({
     where,
-    include: { employee: { select: { id: true, name: true } }, district: true },
+    include: {
+      employee: { select: { id: true, name: true } },
+      district: true,
+      plant: { select: { id: true, name: true, code: true } },
+    },
     orderBy: { checkInAt: "desc" },
   });
 

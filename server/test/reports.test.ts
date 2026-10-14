@@ -16,6 +16,7 @@ async function orderAt(createdAt: string, employeeId: string, districtId: string
     data: {
       employeeId,
       districtId,
+      plantId: employeeId === f.empA.id ? f.plantA.id : f.plantB.id,
       customerName: "Fixture",
       totalAmount: amount,
       createdAt: new Date(createdAt),

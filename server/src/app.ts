@@ -13,6 +13,10 @@ import { productsRouter } from "./routes/products.routes";
 import { ordersRouter } from "./routes/orders.routes";
 import { visitsRouter } from "./routes/visits.routes";
 import { reportsRouter } from "./routes/reports.routes";
+import { plantsRouter } from "./routes/plants.routes";
+import { adminsRouter } from "./routes/admins.routes";
+import { storesRouter } from "./routes/stores.routes";
+import { HttpError } from "./lib/scope";
 
 export const app = express();
 app.set("trust proxy", config.trustProxy);
@@ -36,8 +40,18 @@ app.use("/api/products", productsRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/visits", visitsRouter);
 app.use("/api/reports", reportsRouter);
+app.use("/api/plants", plantsRouter);
+app.use("/api/admins", adminsRouter);
+app.use("/api/stores", storesRouter);
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  if (err instanceof HttpError) {
+    return res.status(err.status).json({ error: err.message });
+  }
+  // A plantId, districtId or similar that points at nothing.
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+    return res.status(400).json({ error: "Refers to a plant, district or product that does not exist" });
+  }
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
     return res.status(404).json({ error: "Not found" });
   }

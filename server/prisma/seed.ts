@@ -64,6 +64,7 @@ async function main() {
   }
   const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
 
+  // The super admin: sees every plant and creates the plants and their admins.
   await prisma.user.upsert({
     where: { phone: adminPhone },
     update: {},
@@ -71,8 +72,7 @@ async function main() {
       name: "Admin",
       phone: adminPhone,
       passwordHash: adminPasswordHash,
-      role: "admin",
-      districtId: chennai.id,
+      role: "super_admin",
     },
   });
   console.log(
@@ -83,6 +83,11 @@ async function main() {
 
   // The shared test login must never exist in production.
   if (!isProduction) {
+    const testPlant = await prisma.plant.upsert({
+      where: { code: "MAIN" },
+      update: {},
+      create: { name: "Main Plant", code: "MAIN" },
+    });
     const testEmpPhone = "9000000001";
     const testEmpPasswordHash = await bcrypt.hash("employee123", 10);
     await prisma.user.upsert({
@@ -94,6 +99,8 @@ async function main() {
         passwordHash: testEmpPasswordHash,
         role: "sales_employee",
         districtId: chennai.id,
+        plantId: testPlant.id,
+        employeeCode: "RLX-MAIN-001",
       },
     });
     console.log(`Seeded test sales employee (phone: ${testEmpPhone}, password: employee123)`);

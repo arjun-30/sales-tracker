@@ -16,7 +16,7 @@ describe("auth", () => {
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toEqual(expect.any(String));
     expect(res.body.refreshToken).toEqual(expect.any(String));
-    expect(res.body.user).toMatchObject({ id: f.admin.id, role: "admin" });
+    expect(res.body.user).toMatchObject({ id: f.admin.id, role: "super_admin" });
     expect(res.body.user.passwordHash).toBeUndefined();
   });
 

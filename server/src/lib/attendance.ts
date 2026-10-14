@@ -64,9 +64,21 @@ export function totalMinutes(days: WorkedDay[]): number {
   return days.reduce((sum, d) => sum + d.minutes, 0);
 }
 
-// Accepts "RLX001", "rlx1", "RLX-001" or a bare "1" and returns "RLX001".
+// Employee codes carry the plant: RLX-CHN-001. Accepts "rlx-chn-1", "RLXCHN001"
+// or "CHN 1" and returns "RLX-CHN-001".
 export function normalizeEmployeeCode(input: string): string | null {
-  const m = input.trim().toUpperCase().replace(/[\s-]/g, "").match(/^(?:RLX)?(\d{1,6})$/);
+  const m = input
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]/g, "")
+    .match(/^(?:RLX(?=[A-Z]{2,5}\d))?([A-Z]{2,5})(\d{1,6})$/);
   if (!m) return null;
-  return `RLX${m[1].replace(/^0+(?=\d)/, "").padStart(3, "0")}`;
+  return employeeCode(m[1], Number(m[2]));
 }
+
+export function employeeCode(plantCode: string, n: number): string {
+  return `RLX-${plantCode}-${String(n).padStart(3, "0")}`;
+}
+
+// Plant codes are 2–5 capital letters (CHN, MDU). RLX is the company prefix.
+export const PLANT_CODE_PATTERN = /^[A-Z]{2,5}$/;

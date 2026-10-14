@@ -42,7 +42,7 @@ describe("products and employees", () => {
     const res = await api()
       .post("/api/employees")
       .set(bearer(admin))
-      .send({ name: "Dup", phone: "9000000001", password: "abcd", districtId: f.chennai.id });
+      .send({ name: "Dup", phone: "9000000001", password: "abcd", districtId: f.chennai.id, plantId: f.plantA.id });
     expect(res.status).toBe(409);
   });
 
@@ -51,7 +51,7 @@ describe("products and employees", () => {
       const res = await api()
         .post("/api/employees")
         .set(bearer(admin))
-        .send({ name: "Bad Phone", phone, password: "abcd", districtId: f.chennai.id });
+        .send({ name: "Bad Phone", phone, password: "abcd", districtId: f.chennai.id, plantId: f.plantA.id });
       expect(res.status, phone).toBe(400);
     }
   });
@@ -88,7 +88,7 @@ describe("products and employees", () => {
     const res = await api()
       .post("/api/employees")
       .set(bearer(admin))
-      .send({ name: "New Rep", phone: "9000000009", password: "abcd", districtId: f.madurai.id });
+      .send({ name: "New Rep", phone: "9000000009", password: "abcd", districtId: f.madurai.id, plantId: f.plantB.id });
     expect(res.status).toBe(201);
     await expect(login("9000000009", "abcd")).resolves.toBeDefined();
   });

@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
-import { requireAuth, requireRole } from "../middleware/auth";
-import { getIO } from "../socket";
+import { requireAdmin, requireAuth, requireRole } from "../middleware/auth";
+import { emitToAdmins } from "../socket";
+import { plantFilter } from "../lib/scope";
 import { closeDuty, startDutySession } from "../lib/duty";
 import { istStartOfDay, totalMinutes, workedByDay } from "../lib/attendance";
 
@@ -42,10 +43,10 @@ trackingRouter.patch("/location", requireRole("sales_employee"), async (req, res
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, districtId: true },
+    select: { id: true, name: true, districtId: true, plantId: true },
   });
 
-  getIO().to("role:admin").emit("employee:location", {
+  emitToAdmins(user?.plantId ?? null, "employee:location", {
     employeeId: userId,
     name: user?.name,
     districtId: user?.districtId,
@@ -91,10 +92,10 @@ trackingRouter.post("/duty", requireRole("sales_employee"), async (req, res) => 
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, districtId: true },
+    select: { id: true, name: true, districtId: true, plantId: true },
   });
 
-  getIO().to("role:admin").emit("employee:duty", {
+  emitToAdmins(user?.plantId ?? null, "employee:duty", {
     employeeId: userId,
     name: user?.name,
     districtId: user?.districtId,
@@ -107,10 +108,22 @@ trackingRouter.post("/duty", requireRole("sales_employee"), async (req, res) => 
   res.json({ location });
 });
 
-trackingRouter.get("/live", requireRole("admin"), async (_req, res) => {
+trackingRouter.get("/live", requireAdmin, async (req, res) => {
   const locations = await prisma.employeeLocation.findMany({
-    where: { onDuty: true },
-    include: { user: { select: { id: true, name: true, districtId: true, district: true } } },
+    where: { onDuty: true, user: plantFilter(req) },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          employeeCode: true,
+          districtId: true,
+          district: true,
+          plantId: true,
+          plant: { select: { id: true, name: true, code: true } },
+        },
+      },
+    },
   });
   res.json({ locations });
 });

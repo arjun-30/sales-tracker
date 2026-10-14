@@ -1,5 +1,5 @@
 import { prisma } from "../db";
-import { getIO } from "../socket";
+import { emitToAdmins } from "../socket";
 import { closeDuty } from "./duty";
 
 // A phone that dies, loses signal for good or has the app force-killed never
@@ -17,6 +17,7 @@ interface SweptRow {
   updatedAt: Date;
   name: string;
   districtId: string | null;
+  plantId: string | null;
 }
 
 export async function sweepStaleDuty(timeoutMinutes = DUTY_TIMEOUT_MINUTES): Promise<number> {
@@ -29,14 +30,14 @@ export async function sweepStaleDuty(timeoutMinutes = DUTY_TIMEOUT_MINUTES): Pro
      WHERE u.id = el."userId"
        AND el."onDuty" = true
        AND el."updatedAt" < now() - make_interval(mins => ${timeoutMinutes}::int)
-    RETURNING el."userId", el.lat, el.lng, el."updatedAt", u.name, u."districtId"
+    RETURNING el."userId", el.lat, el.lng, el."updatedAt", u.name, u."districtId", u."plantId"
   `;
 
   for (const row of rows) {
     // Hours stop at the last ping, not at the sweep: the silent stretch was
     // not time worked.
     await prisma.$transaction((tx) => closeDuty(tx, row.userId, "timeout", row.updatedAt));
-    getIO().to("role:admin").emit("employee:duty", {
+    emitToAdmins(row.plantId, "employee:duty", {
       employeeId: row.userId,
       name: row.name,
       districtId: row.districtId,

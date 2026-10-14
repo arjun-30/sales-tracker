@@ -1,10 +1,12 @@
 // Fills the database with believable demo data for a client presentation:
-// sample prices on every pack size, a handful of salespeople across Tamil
-// Nadu, and two weeks of duty hours, shop visits and orders.
+// sample prices on every pack size, three sample plants (each with an admin,
+// salespeople, stores on the map and some prices of its own), and two weeks
+// of duty hours, shop visits and orders.
 //
 //   npm run demo:seed
 //
-// It WIPES all orders, visits, duty sessions and location history first, so
+// It WIPES all orders, visits, duty sessions, location history, stores and
+// plant prices first, so
 // never run it against real data. Prices it sets are placeholders, not
 // Roalux's real price list. Re-running gives the same data (seeded random).
 import bcrypt from "bcryptjs";
@@ -75,14 +77,25 @@ function samplePrice(category: string, name: string, sizeLabel: string): number 
   return Math.max(5, Math.round((price * tier) / 5) * 5);
 }
 
-// ---- people, shops ----------------------------------------------------------------
+// ---- plants, people, shops ---------------------------------------------------------
+// Sample plants only: the real six and their codes come from the client.
+// `priceFactor` gives each plant prices of its own (1 = company price).
+const PLANTS = [
+  { code: "CHN", name: "Chennai Plant", address: "Ambattur Industrial Estate, Chennai", priceFactor: 1,
+    admin: { phone: "9888888801", name: "Chennai Plant Admin" } },
+  { code: "MDU", name: "Madurai Plant", address: "Kappalur SIDCO, Madurai", priceFactor: 0.96,
+    admin: { phone: "9888888802", name: "Madurai Plant Admin" } },
+  { code: "CBE", name: "Coimbatore Plant", address: "Kurichi SIDCO, Coimbatore", priceFactor: 1.03,
+    admin: { phone: "9888888803", name: "Coimbatore Plant Admin" } },
+];
+
 const STAFF = [
-  { code: "RLX001", phone: "9000000001", name: "Karthik Raja", district: "Chennai", keepPassword: true },
-  { code: "RLX002", phone: "9999999998", name: "Vijay", district: "Cuddalore", keepPassword: true },
-  { code: "RLX003", phone: "9000000003", name: "Senthil Kumar", district: "Madurai" },
-  { code: "RLX004", phone: "9000000004", name: "Priya Dharshini", district: "Coimbatore" },
-  { code: "RLX005", phone: "9000000005", name: "Arun Prakash", district: "Tiruchirappalli" },
-  { code: "RLX006", phone: "9000000006", name: "Manikandan S", district: "Salem" },
+  { plant: "CHN", phone: "9000000001", name: "Karthik Raja", district: "Chennai" },
+  { plant: "CHN", phone: "9999999998", name: "Vijay", district: "Cuddalore" },
+  { plant: "MDU", phone: "9000000003", name: "Senthil Kumar", district: "Madurai" },
+  { plant: "MDU", phone: "9000000005", name: "Arun Prakash", district: "Tiruchirappalli" },
+  { plant: "CBE", phone: "9000000004", name: "Priya Dharshini", district: "Coimbatore" },
+  { plant: "CBE", phone: "9000000006", name: "Manikandan S", district: "Salem" },
 ];
 
 const SHOP_PREFIX = ["Sri", "New", "Om", "Jai", "Royal", "Sree", "Lakshmi", "Balaji", "Ganesh", "Murugan"];
@@ -111,6 +124,8 @@ async function main() {
     prisma.dutySession.deleteMany(),
     prisma.locationHistory.deleteMany(),
     prisma.employeeLocation.deleteMany(),
+    prisma.store.deleteMany(),
+    prisma.plantPrice.deleteMany(),
   ]);
 
   console.log("Setting sample prices…");
@@ -128,35 +143,79 @@ async function main() {
     include: { product: true },
   });
 
+  console.log("Creating plants and their admins…");
+  const demoHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  // Free the demo staff's codes first so they can be renumbered without clashes.
+  await prisma.user.updateMany({ where: { phone: { in: STAFF.map((s) => s.phone) } }, data: { employeeCode: null } });
+  const plants = new Map<string, { id: string; code: string; prices: Map<string, Prisma.Decimal> }>();
+  for (const p of PLANTS) {
+    const plant = await prisma.plant.upsert({
+      where: { code: p.code },
+      update: { name: p.name, address: p.address },
+      create: { code: p.code, name: p.name, address: p.address },
+    });
+    await prisma.user.upsert({
+      where: { phone: p.admin.phone },
+      update: { name: p.admin.name, role: "admin", plantId: plant.id, active: true },
+      create: { phone: p.admin.phone, name: p.admin.name, role: "admin", plantId: plant.id, passwordHash: demoHash },
+    });
+    const prices = new Map<string, Prisma.Decimal>();
+    if (p.priceFactor !== 1) {
+      for (const v of variants) {
+        const price = new Prisma.Decimal(Math.max(5, Math.round((v.price.toNumber() * p.priceFactor) / 5) * 5));
+        await prisma.plantPrice.create({ data: { plantId: plant.id, variantId: v.id, price } });
+        prices.set(v.id, price);
+      }
+    }
+    plants.set(p.code, { id: plant.id, code: p.code, prices });
+  }
+
   console.log("Creating salespeople…");
   const districts = new Map((await prisma.district.findMany()).map((d) => [d.name, d]));
-  const demoHash = await bcrypt.hash(DEMO_PASSWORD, 10);
   const staff = [];
+  const counters = new Map<string, number>();
   for (const s of STAFF) {
     const district = districts.get(s.district)!;
+    const plant = plants.get(s.plant)!;
+    const n = (counters.get(plant.code) ?? 0) + 1;
+    counters.set(plant.code, n);
+    const employeeCode = `RLX-${plant.code}-${String(n).padStart(3, "0")}`;
     const existing = await prisma.user.findUnique({ where: { phone: s.phone } });
     const user = existing
       ? await prisma.user.update({
           where: { id: existing.id },
-          data: { name: s.name, employeeCode: s.code, districtId: district.id, active: true },
+          data: { name: s.name, employeeCode, districtId: district.id, plantId: plant.id, active: true },
         })
       : await prisma.user.create({
           data: {
             name: s.name,
             phone: s.phone,
-            employeeCode: s.code,
+            employeeCode,
             role: "sales_employee",
             districtId: district.id,
+            plantId: plant.id,
             passwordHash: demoHash,
           },
         });
-    staff.push({ user, district });
+    staff.push({ user, district, plant });
+  }
+
+  // The placeholder plant from the migration goes once nothing is left in it.
+  const main = await prisma.plant.findUnique({ where: { code: "MAIN" } });
+  if (main) {
+    const [users, stores] = await Promise.all([
+      prisma.user.count({ where: { plantId: main.id } }),
+      prisma.store.count({ where: { plantId: main.id } }),
+    ]);
+    if (users + stores === 0) await prisma.plant.delete({ where: { id: main.id } });
   }
 
   console.log(`Generating ${DAYS_OF_HISTORY} days of activity…`);
   let orderCount = 0;
   let visitCount = 0;
-  for (const { user, district } of staff) {
+  let storeCount = 0;
+  for (const { user, district, plant } of staff) {
+    const priceOf = (v: (typeof variants)[number]) => plant.prices.get(v.id) ?? v.price;
     const shops = Array.from({ length: 14 }, () => ({
       name: `${pick(SHOP_PREFIX)} ${pick(SHOP_NAME)}`,
       owner: pick(OWNERS),
@@ -164,6 +223,21 @@ async function main() {
       lat: district.centerLat + between(-0.06, 0.06),
       lng: district.centerLng + between(-0.06, 0.06),
     }));
+    // Most shops they visit are stores the plant already has on its map.
+    for (const shop of shops.slice(0, 9)) {
+      await prisma.store.create({
+        data: {
+          plantId: plant.id,
+          name: shop.name,
+          ownerName: shop.owner,
+          phone: shop.phone,
+          address: `${district.name} district`,
+          lat: shop.lat,
+          lng: shop.lng,
+        },
+      });
+      storeCount++;
+    }
     let last: { lat: number; lng: number; at: Date } | null = null;
 
     for (let daysAgo = DAYS_OF_HISTORY; daysAgo >= 1; daysAgo--) {
@@ -187,6 +261,7 @@ async function main() {
           data: {
             employeeId: user.id,
             districtId: district.id,
+            plantId: plant.id,
             shopName: shop.name,
             checkInAt: cursor,
             checkInLat: shop.lat,
@@ -206,7 +281,7 @@ async function main() {
             return { variant: v, quantity: big ? int(1, 4) : int(2, 12) };
           });
           const unique = [...new Map(lines.map((l) => [l.variant.id, l])).values()];
-          const total = unique.reduce((sum, l) => sum.add(l.variant.price.mul(l.quantity)), new Prisma.Decimal(0));
+          const total = unique.reduce((sum, l) => sum.add(priceOf(l.variant).mul(l.quantity)), new Prisma.Decimal(0));
           const status =
             daysAgo >= 4
               ? chance(0.08) ? "cancelled" : chance(0.9) ? "delivered" : "confirmed"
@@ -217,6 +292,7 @@ async function main() {
             data: {
               employeeId: user.id,
               districtId: district.id,
+              plantId: plant.id,
               customerName: shop.owner,
               customerPhone: shop.phone,
               shopName: shop.name,
@@ -226,7 +302,7 @@ async function main() {
               lng: shop.lng,
               createdAt: new Date(checkOut.getTime() - 5 * 60_000),
               items: {
-                create: unique.map((l) => ({ variantId: l.variant.id, quantity: l.quantity, unitPrice: l.variant.price })),
+                create: unique.map((l) => ({ variantId: l.variant.id, quantity: l.quantity, unitPrice: priceOf(l.variant) })),
               },
             },
           });
@@ -247,8 +323,12 @@ async function main() {
   }
 
   const priced = await prisma.productVariant.count({ where: { price: { gt: 0 } } });
-  console.log(`Done: ${staff.length} salespeople, ${visitCount} visits, ${orderCount} orders, ${priced} priced sizes.`);
-  console.log(`New demo logins use password "${DEMO_PASSWORD}" (RLX001 and RLX002 keep theirs).`);
+  console.log(
+    `Done: ${plants.size} plants, ${staff.length} salespeople, ${storeCount} stores, ${visitCount} visits, ${orderCount} orders, ${priced} priced sizes.`
+  );
+  console.log(
+    `Plant admins ${PLANTS.map((p) => p.admin.phone).join(", ")} and new salespeople use password "${DEMO_PASSWORD}"; existing logins keep theirs.`
+  );
 }
 
 main()

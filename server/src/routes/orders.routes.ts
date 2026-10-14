@@ -2,7 +2,9 @@ import { Router } from "express";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
-import { requireAuth, requireRole } from "../middleware/auth";
+import { requireAdmin, requireAuth, requireRole } from "../middleware/auth";
+import { plantPriceMap } from "../lib/prices";
+import { plantFilter } from "../lib/scope";
 
 export const ordersRouter = Router();
 
@@ -40,6 +42,9 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
   if (!employee?.districtId) {
     return res.status(400).json({ error: "Employee has no district assigned" });
   }
+  if (!employee.plantId) {
+    return res.status(400).json({ error: "Employee has no plant assigned" });
+  }
   // Orders are field work: they count towards the working day and are placed
   // where the employee is, so they can only be taken on duty.
   if (!employee.employeeLocation?.onDuty) {
@@ -54,8 +59,12 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
     return res.status(400).json({ error: "One or more product sizes are not found or no longer available" });
   }
 
+  // The salesperson's plant price where it has one, else the company price.
+  const plantPrices = await plantPriceMap(employee.plantId);
+  const priceById = new Map(variants.map((v) => [v.id, plantPrices.get(v.id) ?? v.price]));
+
   // An unpriced size would make a ₹0 order the office then has to chase.
-  const unpriced = variants.filter((v) => v.price.lte(0));
+  const unpriced = variants.filter((v) => priceById.get(v.id)!.lte(0));
   if (unpriced.length > 0) {
     const names = await prisma.productVariant.findMany({
       where: { id: { in: unpriced.map((v) => v.id) } },
@@ -66,7 +75,6 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
     });
   }
 
-  const priceById = new Map(variants.map((v) => [v.id, v.price]));
   const orderItems = items.map((i) => ({
     variantId: i.variantId,
     quantity: i.quantity,
@@ -79,6 +87,7 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
     data: {
       employeeId,
       districtId: employee.districtId,
+      plantId: employee.plantId,
       customerName,
       customerPhone,
       shopName,
@@ -112,8 +121,9 @@ ordersRouter.get("/", async (req, res) => {
   const where: Record<string, unknown> = {};
   if (req.user!.role === "sales_employee") {
     where.employeeId = req.user!.sub;
-  } else if (employeeId) {
-    where.employeeId = employeeId;
+  } else {
+    Object.assign(where, plantFilter(req));
+    if (employeeId) where.employeeId = employeeId;
   }
   if (districtId) where.districtId = districtId;
   if (status) where.status = status;
@@ -129,6 +139,7 @@ ordersRouter.get("/", async (req, res) => {
     include: {
       employee: { select: { id: true, name: true } },
       district: true,
+      plant: { select: { id: true, name: true, code: true } },
       items: { include: { variant: { include: { product: true } } } },
     },
     orderBy: { createdAt: "desc" },
@@ -143,12 +154,17 @@ ordersRouter.get("/:id", async (req, res) => {
     include: {
       employee: { select: { id: true, name: true } },
       district: true,
+      plant: { select: { id: true, name: true, code: true } },
       items: { include: { variant: { include: { product: true } } } },
     },
   });
   if (!order) return res.status(404).json({ error: "Order not found" });
   if (req.user!.role === "sales_employee" && order.employeeId !== req.user!.sub) {
     return res.status(403).json({ error: "Forbidden" });
+  }
+  // Another plant's order is "not found" to a plant admin, so its id says nothing.
+  if (req.user!.role === "admin" && order.plantId !== req.user!.plantId) {
+    return res.status(404).json({ error: "Order not found" });
   }
   res.json({ order });
 });
@@ -168,15 +184,15 @@ export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   cancelled: [],
 };
 
-ordersRouter.patch("/:id/status", requireRole("admin"), async (req, res) => {
+ordersRouter.patch("/:id/status", requireAdmin, async (req, res) => {
   const parsed = statusSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
   const next = parsed.data.status;
 
-  const current = await prisma.order.findUnique({
-    where: { id: req.params.id },
+  const current = await prisma.order.findFirst({
+    where: { id: req.params.id, ...(req.user!.role === "admin" ? { plantId: req.user!.plantId! } : {}) },
     select: { status: true },
   });
   if (!current) return res.status(404).json({ error: "Order not found" });

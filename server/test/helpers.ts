@@ -22,7 +22,7 @@ export const PASSWORD = "secret123";
 export async function resetDb() {
   await prisma.$executeRawUnsafe(`
     TRUNCATE "OrderItem", "Order", "Visit", "LocationHistory", "EmployeeLocation", "DutySession",
-             "ProductVariant", "Product", "User", "District" CASCADE
+             "Store", "PlantPrice", "ProductVariant", "Product", "User", "Plant", "District" CASCADE
   `);
 }
 
@@ -34,14 +34,39 @@ export async function seedFixtures() {
   const madurai = await prisma.district.create({
     data: { name: "Madurai", centerLat: 9.93, centerLng: 78.12 },
   });
+  const plantA = await prisma.plant.create({ data: { name: "Chennai Plant", code: "CHN" } });
+  const plantB = await prisma.plant.create({ data: { name: "Madurai Plant", code: "MDU" } });
+  // "admin" is the super admin: it sees every plant.
   const admin = await prisma.user.create({
-    data: { name: "Admin", phone: "9999999999", passwordHash, role: "admin" },
+    data: { name: "Admin", phone: "9999999999", passwordHash, role: "super_admin" },
+  });
+  const adminA = await prisma.user.create({
+    data: { name: "Admin A", phone: "9888888881", passwordHash, role: "admin", plantId: plantA.id },
+  });
+  const adminB = await prisma.user.create({
+    data: { name: "Admin B", phone: "9888888882", passwordHash, role: "admin", plantId: plantB.id },
   });
   const empA = await prisma.user.create({
-    data: { name: "Emp A", phone: "9000000001", employeeCode: "RLX001", passwordHash, role: "sales_employee", districtId: chennai.id },
+    data: {
+      name: "Emp A",
+      phone: "9000000001",
+      employeeCode: "RLX-CHN-001",
+      passwordHash,
+      role: "sales_employee",
+      districtId: chennai.id,
+      plantId: plantA.id,
+    },
   });
   const empB = await prisma.user.create({
-    data: { name: "Emp B", phone: "9000000002", employeeCode: "RLX002", passwordHash, role: "sales_employee", districtId: madurai.id },
+    data: {
+      name: "Emp B",
+      phone: "9000000002",
+      employeeCode: "RLX-MDU-001",
+      passwordHash,
+      role: "sales_employee",
+      districtId: madurai.id,
+      plantId: plantB.id,
+    },
   });
   const product = await prisma.product.create({
     data: {
@@ -72,7 +97,11 @@ export async function seedFixtures() {
   return {
     chennai,
     madurai,
+    plantA,
+    plantB,
     admin,
+    adminA,
+    adminB,
     empA,
     empB,
     product,

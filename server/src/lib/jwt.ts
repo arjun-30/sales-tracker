@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { config } from "../config";
 
-export type Role = "admin" | "sales_employee";
+export type Role = "admin" | "sales_employee" | "super_admin";
 
 export interface AccessTokenPayload {
   sub: string;
