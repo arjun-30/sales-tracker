@@ -66,12 +66,12 @@ export default function LoginScreen() {
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.brand}>
             <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
-            <Text style={styles.brandTag}>Sales app</Text>
+            <Text style={styles.brandTag}>Field sales</Text>
           </View>
 
           <View>
-            <Text style={styles.title}>Welcome back</Text>
-            <Text style={styles.subtitle}>Log in with your registered mobile number.</Text>
+            <Text style={styles.title}>Sign in</Text>
+            <Text style={styles.subtitle}>Use your registered mobile number and password.</Text>
           </View>
 
           <View style={styles.form}>
@@ -156,7 +156,7 @@ export default function LoginScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
-                  <Text style={styles.submitText}>Log in</Text>
+                  <Text style={styles.submitText}>Sign in</Text>
                   <Ionicons name="arrow-forward" size={20} color="#fff" />
                 </>
               )}
@@ -176,46 +176,47 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.surface },
-  container: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 32, gap: 28 },
-  brand: { alignItems: "center", gap: 6 },
-  logo: { width: 210, height: 73 },
-  brandTag: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: colors.textFaint,
-    letterSpacing: 3,
-    textTransform: "uppercase",
+  safe: { flex: 1, backgroundColor: colors.background },
+  container: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingVertical: 32, gap: 24 },
+  brand: { alignItems: "center", gap: 8, marginBottom: 8 },
+  logo: { width: 168, height: 58 },
+  brandTag: { fontSize: 13, fontWeight: "500", color: colors.textMuted, letterSpacing: 0.3 },
+  title: { fontSize: 24, fontWeight: "700", color: colors.text },
+  subtitle: { fontSize: 14, color: colors.textMuted, marginTop: 4, lineHeight: 20 },
+  form: {
+    gap: 18,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
   },
-  title: { fontSize: 28, fontWeight: "800", color: colors.text },
-  subtitle: { fontSize: 15, color: colors.textMuted, marginTop: 4 },
-  form: { gap: 18 },
   labelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
-  label: { fontSize: 14, fontWeight: "700", color: colors.text },
-  counter: { fontSize: 13, fontWeight: "700", color: colors.textFaint, fontVariant: ["tabular-nums"] },
+  label: { fontSize: 13, fontWeight: "600", color: colors.textMuted },
+  counter: { fontSize: 12, fontWeight: "600", color: colors.textFaint, fontVariant: ["tabular-nums"] },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 56,
-    borderWidth: 1.5,
+    minHeight: 52,
+    borderWidth: 1,
     borderColor: colors.borderStrong,
     borderRadius: radius.md,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     paddingRight: 12,
     overflow: "hidden",
   },
-  inputFocused: { borderColor: colors.primary, backgroundColor: colors.surface },
+  inputFocused: { borderColor: colors.primary, borderWidth: 1.5 },
   prefix: {
     alignSelf: "stretch",
     justifyContent: "center",
     paddingHorizontal: 14,
     borderRightWidth: 1,
     borderRightColor: colors.border,
-    marginRight: 2,
+    backgroundColor: colors.background,
   },
-  prefixText: { fontSize: 17, fontWeight: "700", color: colors.text },
-  input: { flex: 1, fontSize: 17, color: colors.text, paddingHorizontal: 12, paddingVertical: 14 },
-  phoneInput: { letterSpacing: 1.5, fontWeight: "600" },
+  prefixText: { fontSize: 15, fontWeight: "600", color: colors.text },
+  input: { flex: 1, fontSize: 16, color: colors.text, paddingHorizontal: 12, paddingVertical: 13 },
+  phoneInput: { letterSpacing: 1, fontWeight: "500" },
   hint: { fontSize: 13, color: colors.warning, fontWeight: "500" },
   eye: { padding: 6 },
   error: {
@@ -232,13 +233,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    minHeight: 56,
+    minHeight: 52,
     borderRadius: radius.md,
     backgroundColor: colors.primary,
-    marginTop: 4,
+    marginTop: 2,
   },
-  submitDisabled: { backgroundColor: colors.textFaint },
-  submitText: { color: "#fff", fontSize: 17, fontWeight: "800" },
+  submitDisabled: { opacity: 0.4 },
+  submitText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   help: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   helpText: { color: colors.textFaint, fontSize: 13 },
   serverLink: { alignItems: "center", paddingVertical: 6 },

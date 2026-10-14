@@ -122,17 +122,17 @@ export default function HomeScreen() {
           <Text style={styles.meta}>
             {[user?.employeeCode, user?.district?.name ?? "No district assigned"].filter(Boolean).join("   ·   ")}
           </Text>
+          {onDuty ? (
+            <View style={styles.dutyLine}>
+              <View style={[styles.dot, { backgroundColor: colors.success }]} />
+              <Text style={styles.dutyLineText}>
+                <Text style={styles.dutyLineStrong}>On duty</Text>  ·  hours being recorded
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        {onDuty ? (
-          <Card style={styles.dutyOn}>
-            <View style={[styles.dot, { backgroundColor: colors.success }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.dutyTitle}>On duty</Text>
-              <Text style={styles.dutyHint}>Your working hours are being recorded.</Text>
-            </View>
-          </Card>
-        ) : (
+        {onDuty ? null : (
           <Card style={styles.dutyOff}>
             <View style={styles.dutyRow}>
               <View style={[styles.dot, { backgroundColor: colors.textFaint }]} />
@@ -143,6 +143,7 @@ export default function HomeScreen() {
           </Card>
         )}
 
+        <View style={styles.section}>
         <SectionLabel>Today</SectionLabel>
         <Card style={styles.stats}>
           <Stat label="Orders" value={stats ? String(stats.orders) : "–"} />
@@ -152,11 +153,15 @@ export default function HomeScreen() {
           <Stat label="Visits" value={stats ? String(stats.visits) : "–"} />
         </Card>
 
+        </View>
+
+        <View style={styles.section}>
         <SectionLabel>Quick actions</SectionLabel>
         <Action icon="bag-add-outline" label="New order" primary={onDuty} onPress={newOrder} />
         <View style={styles.actions}>
           <Action icon="storefront-outline" label="Shop visit" onPress={() => navigation.navigate("Visits")} />
           <Action icon="pricetags-outline" label="Price list" onPress={() => navigation.navigate("Catalog")} />
+        </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -201,7 +206,8 @@ function Action({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  container: { padding: 16, gap: 14, paddingBottom: 32 },
+  container: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40, gap: 28 },
+  section: { gap: 12 },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   logo: { width: 92, height: 32 },
   avatar: {
@@ -213,19 +219,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { fontSize: 14, fontWeight: "700", color: colors.text, letterSpacing: 0.5 },
-  header: { marginTop: 6, marginBottom: 2 },
+  header: { marginTop: -4 },
   date: { fontSize: 13, color: colors.textMuted, fontWeight: "500" },
   greeting: { fontSize: 24, fontWeight: "700", color: colors.text, marginTop: 4 },
   meta: { fontSize: 14, color: colors.textMuted, marginTop: 6 },
-  dutyOn: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16 },
-  dutyOff: { gap: 10, padding: 18 },
+  dutyLine: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
+  dutyLineText: { fontSize: 14, color: colors.textMuted },
+  dutyLineStrong: { color: colors.success, fontWeight: "700" },
+  dutyOff: { gap: 12, padding: 20 },
   dutyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { width: 9, height: 9, borderRadius: 5 },
   dutyTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
   dutyHint: { fontSize: 14, color: colors.textMuted, lineHeight: 20, marginTop: 2 },
   stats: { flexDirection: "row", padding: 0 },
-  stat: { flex: 1, paddingVertical: 16, paddingHorizontal: 14, gap: 6 },
-  statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 14 },
+  stat: { flex: 1, paddingVertical: 20, paddingHorizontal: 16, gap: 8 },
+  statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 18 },
   statLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600", letterSpacing: 0.3 },
   statValue: { fontSize: 22, fontWeight: "700", color: colors.text },
   actions: { flexDirection: "row", gap: 12 },
@@ -235,7 +243,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    minHeight: 52,
+    minHeight: 56,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
