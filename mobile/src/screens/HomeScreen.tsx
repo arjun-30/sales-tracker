@@ -83,6 +83,38 @@ export default function HomeScreen() {
     navigation.navigate("NewOrder");
   }
 
+  // Ending duty stops the working-hours clock, so it lives behind the menu and
+  // a confirmation rather than as a button that can be tapped by accident.
+  function confirmEndDuty() {
+    Alert.alert(
+      "End duty for today?",
+      "Your working hours stop counting from now and the office will see you as off duty.",
+      [
+        { text: "Keep working", style: "cancel" },
+        { text: "End duty", style: "destructive", onPress: toggleDuty },
+      ]
+    );
+  }
+
+  function openMenu() {
+    if (onDuty) {
+      Alert.alert("Menu", undefined, [
+        { text: "End duty", onPress: confirmEndDuty },
+        {
+          text: "Log out",
+          // Logging out would stop tracking without ending the shift properly.
+          onPress: () => Alert.alert("You're on duty", "End duty before logging out."),
+        },
+        { text: "Close", style: "cancel" },
+      ]);
+    } else {
+      Alert.alert("Menu", undefined, [
+        { text: "Log out", onPress: logout },
+        { text: "Close", style: "cancel" },
+      ]);
+    }
+  }
+
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
   return (
@@ -99,15 +131,14 @@ export default function HomeScreen() {
           />
         }
       >
-        <View style={styles.hero}>
-          <View style={styles.heroTop}>
-            <View style={styles.logoPlate}>
-              <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
-            </View>
-            <TouchableOpacity style={styles.logout} onPress={logout} accessibilityLabel="Log out">
-              <Ionicons name="log-out-outline" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.headerTop}>
+          <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
+          <TouchableOpacity style={styles.menu} onPress={openMenu} accessibilityLabel="Menu">
+            <Ionicons name="ellipsis-horizontal" size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.header}>
           <Text style={styles.date}>{today}</Text>
           <Text style={styles.greeting}>
             {greeting()}, {user?.name?.split(" ")[0]}
@@ -117,23 +148,24 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        <Card style={styles.duty}>
-          <View style={styles.dutyRow}>
-            <View style={[styles.dot, { backgroundColor: onDuty ? colors.success : colors.textFaint }]} />
-            <Text style={styles.dutyTitle}>{onDuty ? "On duty" : "Off duty"}</Text>
-          </View>
-          <Text style={styles.dutyHint}>
-            {onDuty
-              ? "Your location is being shared with the office."
-              : "Start duty to take orders, log shop visits and share your location."}
-          </Text>
-          <Button
-            label={onDuty ? "Go off duty" : "Start duty"}
-            variant={onDuty ? "secondary" : "primary"}
-            loading={busy}
-            onPress={toggleDuty}
-          />
-        </Card>
+        {onDuty ? (
+          <Card style={styles.dutyOn}>
+            <View style={[styles.dot, { backgroundColor: colors.success }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dutyTitle}>On duty</Text>
+              <Text style={styles.dutyHint}>Your working hours are being recorded.</Text>
+            </View>
+          </Card>
+        ) : (
+          <Card style={styles.dutyOff}>
+            <View style={styles.dutyRow}>
+              <View style={[styles.dot, { backgroundColor: colors.textFaint }]} />
+              <Text style={styles.dutyTitle}>Off duty</Text>
+            </View>
+            <Text style={styles.dutyHint}>Start duty to take orders, log shop visits and record your hours.</Text>
+            <Button label="Start duty" loading={busy} onPress={toggleDuty} />
+          </Card>
+        )}
 
         <SectionLabel>Today</SectionLabel>
         <Card style={styles.stats}>
@@ -145,10 +177,7 @@ export default function HomeScreen() {
         </Card>
 
         <SectionLabel>Quick actions</SectionLabel>
-        <TouchableOpacity activeOpacity={0.85} style={styles.primaryAction} onPress={newOrder} accessibilityRole="button">
-          <Ionicons name="add" size={22} color="#fff" />
-          <Text style={styles.primaryActionText}>New order</Text>
-        </TouchableOpacity>
+        <Action icon="add" label="New order" primary={onDuty} onPress={newOrder} />
         <View style={styles.actions}>
           <Action icon="storefront-outline" label="Shop visit" onPress={() => navigation.navigate("Visits")} />
           <Action icon="pricetags-outline" label="Price list" onPress={() => navigation.navigate("Catalog")} />
@@ -169,19 +198,27 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+// White buttons by default; only the one main action on screen is filled.
 function Action({
   icon,
   label,
+  primary = false,
   onPress,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   label: string;
+  primary?: boolean;
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity activeOpacity={0.7} style={styles.action} onPress={onPress} accessibilityRole="button">
-      <Ionicons name={icon} size={22} color={colors.primary} />
-      <Text style={styles.actionLabel}>{label}</Text>
+    <TouchableOpacity
+      activeOpacity={0.75}
+      style={[styles.action, primary && styles.actionPrimary]}
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <Ionicons name={icon} size={21} color={primary ? "#fff" : colors.text} />
+      <Text style={[styles.actionLabel, primary && { color: "#fff" }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -189,41 +226,33 @@ function Action({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { padding: 16, gap: 14, paddingBottom: 32 },
-  hero: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: 20, paddingTop: 16 },
-  heroTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
-  logoPlate: { backgroundColor: "#fff", borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 4 },
-  logo: { width: 84, height: 28 },
-  logout: {
-    width: 38,
-    height: 38,
+  headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+  logo: { width: 92, height: 32 },
+  menu: {
+    width: 40,
+    height: 40,
     borderRadius: radius.sm,
-    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  date: { fontSize: 13, color: "rgba(255,255,255,0.72)", fontWeight: "500" },
-  greeting: { fontSize: 24, fontWeight: "700", color: "#fff", marginTop: 4 },
-  meta: { fontSize: 14, color: "rgba(255,255,255,0.72)", marginTop: 6, fontWeight: "500" },
-  duty: { gap: 10, padding: 18 },
+  header: { marginTop: 6, marginBottom: 2 },
+  date: { fontSize: 13, color: colors.textMuted, fontWeight: "500" },
+  greeting: { fontSize: 24, fontWeight: "700", color: colors.text, marginTop: 4 },
+  meta: { fontSize: 14, color: colors.textMuted, marginTop: 6 },
+  dutyOn: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16 },
+  dutyOff: { gap: 10, padding: 18 },
   dutyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { width: 9, height: 9, borderRadius: 5 },
-  dutyTitle: { fontSize: 17, fontWeight: "700", color: colors.text },
-  dutyHint: { fontSize: 14, color: colors.textMuted, marginBottom: 4, lineHeight: 20 },
+  dutyTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
+  dutyHint: { fontSize: 14, color: colors.textMuted, lineHeight: 20, marginTop: 2 },
   stats: { flexDirection: "row", padding: 0 },
   stat: { flex: 1, paddingVertical: 16, paddingHorizontal: 14, gap: 6 },
   statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 14 },
   statLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600", letterSpacing: 0.3 },
   statValue: { fontSize: 22, fontWeight: "700", color: colors.text },
-  primaryAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    minHeight: 54,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
-  },
-  primaryActionText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   actions: { flexDirection: "row", gap: 12 },
   action: {
     flex: 1,
@@ -231,11 +260,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    minHeight: 54,
+    minHeight: 52,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
   actionLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
 });
