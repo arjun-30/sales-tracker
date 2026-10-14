@@ -1,14 +1,38 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../lib/api";
 import { getCurrentPosition } from "../lib/locationTask";
+import { useDuty } from "../context/DutyContext";
 import type { Visit } from "../lib/types";
 import { Button, Card, EmptyState, Field, Loading, SectionLabel } from "../components/ui";
-import { colors, formatDateTime, formatDuration, formatTime, radius } from "../theme";
+import { colors, formatDuration, formatTime } from "../theme";
+
+const RECENT_SHOPS = 3;
+
+function minutesBetween(from: string, to: string | null) {
+  return Math.max(0, ((to ? new Date(to).getTime() : Date.now()) - new Date(from).getTime()) / 60000);
+}
+
+function hoursAndMinutes(minutes: number) {
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+}
 
 export default function VisitsScreen() {
+  const { onDuty, busy: dutyBusy, toggleDuty } = useDuty();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -35,16 +59,48 @@ export default function VisitsScreen() {
 
   const openVisit = visits.find((v) => !v.checkOutAt);
 
-  // Re-render every 30 s so the "time at shop" counter stays current.
+  // Re-render every 30 s so the time-at-shop counter stays current.
   useEffect(() => {
     if (!openVisit) return;
     const id = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(id);
   }, [openVisit]);
 
+  const history = useMemo(() => visits.filter((v) => v.checkOutAt), [visits]);
+
+  // Shops this salesperson keeps going back to, for one-tap check-in.
+  const recentShops = useMemo(() => {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const v of history) {
+      const key = v.shopName.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        names.push(v.shopName.trim());
+      }
+      if (names.length === RECENT_SHOPS) break;
+    }
+    return names;
+  }, [history]);
+
+  const days = useMemo(() => {
+    const groups: { label: string; visits: Visit[]; minutes: number }[] = [];
+    for (const v of history) {
+      const label = dayLabel(v.checkInAt);
+      let group = groups[groups.length - 1];
+      if (!group || group.label !== label) {
+        group = { label, visits: [], minutes: 0 };
+        groups.push(group);
+      }
+      group.visits.push(v);
+      group.minutes += minutesBetween(v.checkInAt, v.checkOutAt);
+    }
+    return groups;
+  }, [history]);
+
   async function handleCheckIn() {
     if (!shopName.trim()) {
-      Alert.alert("Missing info", "Shop name is required.");
+      Alert.alert("Shop name needed", "Enter the name of the shop you're visiting.");
       return;
     }
     setSubmitting(true);
@@ -62,7 +118,7 @@ export default function VisitsScreen() {
       setNotes("");
       await load();
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Check-in failed");
+      Alert.alert("Couldn't check in", err instanceof Error ? err.message : "Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -80,7 +136,7 @@ export default function VisitsScreen() {
       await api(`/api/visits/${openVisit.id}/checkout`, { method: "POST", body: JSON.stringify(pos) });
       await load();
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Check-out failed");
+      Alert.alert("Couldn't check out", err instanceof Error ? err.message : "Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -88,14 +144,10 @@ export default function VisitsScreen() {
 
   if (loading) return <Loading />;
 
-  const history = visits.filter((v) => v.checkOutAt);
-
   return (
-    <FlatList
+    <ScrollView
       style={{ backgroundColor: colors.background }}
-      data={history}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
@@ -106,80 +158,129 @@ export default function VisitsScreen() {
           }}
         />
       }
-      ListHeaderComponent={
-        <View style={{ gap: 16, marginBottom: 4 }}>
-          {openVisit ? (
-            <Card style={styles.active}>
-              <View style={styles.activeHeader}>
-                <View style={styles.liveDot} />
-                <Text style={styles.activeLabel}>At a shop now</Text>
-              </View>
-              <Text style={styles.activeShop}>{openVisit.shopName}</Text>
-              <View style={styles.metaRow}>
-                <Ionicons name="time-outline" size={16} color={colors.textMuted} />
-                <Text style={styles.meta}>
-                  In since {formatTime(openVisit.checkInAt)} · {formatDuration(openVisit.checkInAt)}
-                </Text>
-              </View>
-              {openVisit.notes ? <Text style={styles.notes}>{openVisit.notes}</Text> : null}
-              <Button label="Check out" icon="exit-outline" variant="danger" onPress={handleCheckOut} loading={submitting} />
-            </Card>
-          ) : (
-            <Card style={{ gap: 14 }}>
-              <Text style={styles.formTitle}>Check in to a shop</Text>
-              <Field icon="storefront-outline" placeholder="Shop name *" value={shopName} onChangeText={setShopName} />
-              <Field icon="create-outline" placeholder="Notes (optional)" value={notes} onChangeText={setNotes} />
-              <Button label="Check in here" icon="location" onPress={handleCheckIn} loading={submitting} />
-              <Text style={styles.hint}>Your current GPS location is saved with the visit.</Text>
-            </Card>
-          )}
-          {history.length > 0 ? <SectionLabel>Recent visits</SectionLabel> : null}
-        </View>
-      }
-      ListEmptyComponent={
-        openVisit ? null : (
-          <EmptyState icon="storefront-outline" title="No visits yet" hint="Check in when you reach a shop." />
-        )
-      }
-      renderItem={({ item }) => (
-        <Card style={styles.visit}>
-          <View style={styles.visitIcon}>
-            <Ionicons name="storefront" size={18} color={colors.primary} />
+    >
+      {openVisit ? (
+        <Card style={styles.card}>
+          <View style={styles.statusRow}>
+            <View style={[styles.dot, { backgroundColor: colors.success }]} />
+            <Text style={styles.statusText}>At shop now</Text>
+            <Text style={styles.timer}>{hoursAndMinutes(minutesBetween(openVisit.checkInAt, null))}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.shop} numberOfLines={1}>
-              {item.shopName}
-            </Text>
-            <Text style={styles.meta}>
-              {formatDateTime(item.checkInAt)} · {formatDuration(item.checkInAt, item.checkOutAt)}
-            </Text>
+          <Text style={styles.activeShop}>{openVisit.shopName}</Text>
+          <Text style={styles.meta}>Checked in at {formatTime(openVisit.checkInAt)}</Text>
+          {openVisit.notes ? <Text style={styles.notes}>{openVisit.notes}</Text> : null}
+          <Button label="Check out" icon="log-out-outline" onPress={handleCheckOut} loading={submitting} />
+        </Card>
+      ) : !onDuty ? (
+        <Card style={styles.card}>
+          <View style={styles.statusRow}>
+            <View style={[styles.dot, { backgroundColor: colors.textFaint }]} />
+            <Text style={styles.statusText}>Off duty</Text>
           </View>
+          <Text style={styles.cardTitle}>Start duty to check in</Text>
+          <Text style={styles.meta}>Shop visits are recorded against your working day.</Text>
+          <Button label="Start duty" onPress={toggleDuty} loading={dutyBusy} />
+        </Card>
+      ) : (
+        <Card style={styles.card}>
+          <Text style={styles.cardTitle}>Check in to a shop</Text>
+          <Text style={styles.meta}>Your current location is saved with the visit.</Text>
+          <Field
+            label="Shop name"
+            icon="storefront-outline"
+            placeholder="e.g. Sri Murugan Paints"
+            value={shopName}
+            onChangeText={setShopName}
+          />
+          {recentShops.length > 0 && !shopName ? (
+            <View style={styles.recent}>
+              <Text style={styles.recentLabel}>Recent shops</Text>
+              {recentShops.map((name, i) => (
+                <TouchableOpacity
+                  key={name}
+                  style={[styles.recentShop, i > 0 && styles.recentShopBorder]}
+                  onPress={() => setShopName(name)}
+                >
+                  <Ionicons name="time-outline" size={16} color={colors.textMuted} />
+                  <Text style={styles.recentShopText} numberOfLines={1}>
+                    {name}
+                  </Text>
+                  <Ionicons name="arrow-up-outline" size={15} color={colors.textFaint} style={{ transform: [{ rotate: "-45deg" }] }} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+          <Field
+            label="Notes (optional)"
+            icon="create-outline"
+            placeholder="e.g. asked for shade card"
+            value={notes}
+            onChangeText={setNotes}
+          />
+          <Button label="Check in" icon="location-outline" onPress={handleCheckIn} loading={submitting} />
         </Card>
       )}
-    />
+
+      {days.length === 0 && !openVisit ? (
+        <EmptyState icon="storefront-outline" title="No visits yet" hint="Your shop visits will appear here." />
+      ) : null}
+
+      {days.map((day) => (
+        <View key={day.label} style={styles.day}>
+          <View style={styles.dayHeader}>
+            <SectionLabel>{day.label}</SectionLabel>
+            <Text style={styles.daySummary}>
+              {day.visits.length} {day.visits.length === 1 ? "visit" : "visits"} · {hoursAndMinutes(day.minutes)}
+            </Text>
+          </View>
+          <Card style={styles.group}>
+            {day.visits.map((v, i) => (
+              <View key={v.id}>
+                {i > 0 ? <View style={styles.divider} /> : null}
+                <View style={styles.row}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.shop} numberOfLines={1}>
+                      {v.shopName}
+                    </Text>
+                    <Text style={styles.rowMeta}>
+                      {formatTime(v.checkInAt)} – {formatTime(v.checkOutAt!)}
+                      {v.notes ? `  ·  ${v.notes}` : ""}
+                    </Text>
+                  </View>
+                  <Text style={styles.duration}>{formatDuration(v.checkInAt, v.checkOutAt)}</Text>
+                </View>
+              </View>
+            ))}
+          </Card>
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16, gap: 10, paddingBottom: 32 },
-  formTitle: { fontSize: 18, fontWeight: "800", color: colors.text },
-  hint: { fontSize: 12, color: colors.textFaint, textAlign: "center" },
-  active: { gap: 10, borderColor: colors.success, borderWidth: 2, backgroundColor: colors.successSoft },
-  activeHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success },
-  activeLabel: { fontSize: 12, fontWeight: "800", color: colors.success, textTransform: "uppercase", letterSpacing: 0.6 },
-  activeShop: { fontSize: 22, fontWeight: "800", color: colors.text },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  meta: { fontSize: 13, color: colors.textMuted },
-  notes: { fontSize: 14, color: colors.text, fontStyle: "italic" },
-  visit: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
-  visitIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  shop: { fontSize: 15, fontWeight: "700", color: colors.text },
+  container: { padding: 16, gap: 18, paddingBottom: 32 },
+  card: { gap: 12, padding: 18 },
+  cardTitle: { fontSize: 18, fontWeight: "700", color: colors.text },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dot: { width: 9, height: 9, borderRadius: 5 },
+  statusText: { flex: 1, fontSize: 13, fontWeight: "600", color: colors.textMuted },
+  timer: { fontSize: 15, fontWeight: "700", color: colors.text, fontVariant: ["tabular-nums"] },
+  activeShop: { fontSize: 22, fontWeight: "700", color: colors.text },
+  meta: { fontSize: 14, color: colors.textMuted, marginTop: -6 },
+  notes: { fontSize: 14, color: colors.text },
+  recent: { marginTop: -4 },
+  recentLabel: { fontSize: 12, fontWeight: "600", color: colors.textMuted, marginBottom: 2 },
+  recentShop: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
+  recentShopBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  recentShopText: { flex: 1, fontSize: 15, color: colors.text },
+  day: { gap: 8 },
+  dayHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
+  daySummary: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
+  group: { padding: 0 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 16 },
+  divider: { height: 1, backgroundColor: colors.border, marginLeft: 16 },
+  shop: { fontSize: 15, fontWeight: "600", color: colors.text },
+  rowMeta: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  duration: { fontSize: 14, fontWeight: "600", color: colors.text, fontVariant: ["tabular-nums"] },
 });
