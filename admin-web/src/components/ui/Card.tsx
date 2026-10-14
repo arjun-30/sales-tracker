@@ -17,6 +17,8 @@ export function CardHeader({ title, description, actions }: { title: string; des
   );
 }
 
+// A headline number: icon tile, label, the figure, and an optional one-line
+// hint. Cards in a row stay the same height whether or not they have a hint.
 export function StatCard({
   label,
   value,
@@ -26,22 +28,29 @@ export function StatCard({
 }: {
   label: string;
   value: ReactNode;
-  icon?: ComponentType<{ className?: string }>;
+  icon?: ComponentType<{ className?: string; strokeWidth?: number }>;
   hint?: ReactNode;
-  // The one figure on a page that matters most gets the Roalux red rule.
+  // The figure that matters most on the page gets a filled cobalt tile.
   accent?: boolean;
-  tone?: string;
 }) {
   return (
-    <Card className={`relative overflow-hidden px-5 py-4 ${accent ? "border-t-2 border-t-brand-600" : ""}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-[13px] font-medium text-neutral-500">{label}</div>
-        {Icon ? <Icon className="h-4 w-4 text-neutral-400" /> : null}
+    <Card className="flex items-start gap-4 px-5 py-4">
+      {Icon ? (
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+            accent ? "bg-brand-600 text-white" : "bg-sand-100 text-brand-700"
+          }`}
+        >
+          <Icon className="h-5 w-5" strokeWidth={2} />
+        </div>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-medium text-neutral-500">{label}</div>
+        <div className="mt-1 truncate text-[24px] font-semibold leading-tight tracking-tight text-neutral-900 tabular-nums">
+          {value}
+        </div>
+        <div className="mt-0.5 min-h-[18px] truncate text-xs text-neutral-500">{hint ?? " "}</div>
       </div>
-      <div className="mt-2 truncate text-[26px] font-semibold leading-none tracking-tight text-neutral-900 tabular-nums">
-        {value}
-      </div>
-      {hint ? <div className="mt-2 text-xs text-neutral-500">{hint}</div> : null}
     </Card>
   );
 }

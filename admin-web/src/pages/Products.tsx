@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
-import { ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Layers, Package, Plus, Search } from "lucide-react";
 import { api } from "../lib/api";
 import { formatINR } from "../lib/format";
 import type { Product, ProductVariant } from "../lib/types";
@@ -173,11 +173,12 @@ export function Products() {
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Products" value={products.length} />
-        <StatCard label="Pack sizes" value={allSizes.length} />
-        <StatCard label="Sizes with a price" value={allSizes.length - unpricedSizes} />
+        <StatCard label="Products" value={products.length} icon={Package} hint={`${categories.length} categories`} />
+        <StatCard label="Pack sizes" value={allSizes.length} icon={Layers} hint="Active sizes on sale" />
+        <StatCard label="Sizes with a price" value={allSizes.length - unpricedSizes} icon={CheckCircle2} hint="Can be ordered" />
         <StatCard
           label="Sizes missing a price"
+          icon={AlertCircle}
           value={<span className={unpricedSizes ? "text-red-600" : ""}>{unpricedSizes}</span>}
           hint={unpricedSizes ? `Across ${productsMissing} products. These can't be ordered.` : "Everything is priced."}
           accent={unpricedSizes > 0}

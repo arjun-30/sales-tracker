@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, UserCheck, Users, UserX } from "lucide-react";
+import { Clock, Plus, Search, UserCheck, Users, UserX } from "lucide-react";
 import { api } from "../lib/api";
 import { formatMinutes, timeAgo } from "../lib/format";
 import type { District, Employee } from "../lib/types";
@@ -120,10 +120,15 @@ export function Employees() {
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Sales staff" value={employees.length} icon={Users} />
-        <StatCard label="On duty now" value={onDutyCount} icon={UserCheck} accent />
-        <StatCard label="Hours worked today" value={formatMinutes(minutesToday)} hint="All staff combined" />
-        <StatCard label="Disabled accounts" value={disabledCount} icon={UserX} />
+        <StatCard
+          label="Sales staff"
+          value={employees.length}
+          icon={Users}
+          hint={`Across ${new Set(employees.map((e) => e.districtId).filter(Boolean)).size} districts`}
+        />
+        <StatCard label="On duty now" value={onDutyCount} icon={UserCheck} hint="Sharing location live" accent />
+        <StatCard label="Hours worked today" value={formatMinutes(minutesToday)} icon={Clock} hint="All staff combined" />
+        <StatCard label="Disabled accounts" value={disabledCount} icon={UserX} hint="Can't log in to the app" />
       </div>
 
       {showForm && (
