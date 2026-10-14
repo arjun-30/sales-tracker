@@ -21,6 +21,15 @@ export const colors = {
   background: "#f3ede3",
 };
 
+// Supporting colours for icons and soft tinted tiles on top of beige and cobalt.
+// Use the soft tint as a background with the strong colour for icon and text.
+export const accents = {
+  cobalt: { strong: "#0047ab", soft: "#e6edf9" },
+  green: { strong: "#1f7a4d", soft: "#e4f2ea" },
+  terracotta: { strong: "#b4532a", soft: "#f8e8df" },
+  amber: { strong: "#9a6700", soft: "#fbf0d7" },
+};
+
 
 export const radius = { sm: 8, md: 12, lg: 16, pill: 999 };
 

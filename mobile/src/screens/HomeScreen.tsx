@@ -19,7 +19,7 @@ import { api } from "../lib/api";
 import type { Order, Visit } from "../lib/types";
 import type { RootStackParamList, TabParamList } from "../navigation/types";
 import { Button, Card, SectionLabel } from "../components/ui";
-import { colors, formatINR, radius } from "../theme";
+import { accents, colors, formatINR, radius } from "../theme";
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList, "Home">,
@@ -106,7 +106,7 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        <Card style={styles.duty}>
+        <Card style={[styles.duty, onDuty && styles.dutyOn]}>
           <View style={styles.dutyRow}>
             <View style={[styles.dot, { backgroundColor: onDuty ? colors.success : colors.textFaint }]} />
             <Text style={styles.dutyTitle}>{onDuty ? "On duty" : "Off duty"}</Text>
@@ -126,29 +126,33 @@ export default function HomeScreen() {
 
         <SectionLabel>Today</SectionLabel>
         <Card style={styles.stats}>
-          <Stat label="Orders" value={stats ? String(stats.orders) : "–"} />
+          <Stat icon="receipt-outline" tone={accents.cobalt} label="Orders" value={stats ? String(stats.orders) : "–"} />
           <View style={styles.statDivider} />
-          <Stat label="Sales" value={stats ? formatINR(stats.sales) : "–"} />
+          <Stat icon="cash-outline" tone={accents.green} label="Sales" value={stats ? formatINR(stats.sales) : "–"} />
           <View style={styles.statDivider} />
-          <Stat label="Visits" value={stats ? String(stats.visits) : "–"} />
+          <Stat icon="storefront-outline" tone={accents.terracotta} label="Visits" value={stats ? String(stats.visits) : "–"} />
         </Card>
 
         <SectionLabel>Quick actions</SectionLabel>
-        <Card style={styles.actions}>
-          <Action icon="add-circle-outline" label="New order" onPress={() => navigation.navigate("NewOrder")} />
-          <View style={styles.actionDivider} />
-          <Action icon="storefront-outline" label="Shop visit" onPress={() => navigation.navigate("Visits")} />
-          <View style={styles.actionDivider} />
-          <Action icon="pricetags-outline" label="Price list" onPress={() => navigation.navigate("Catalog")} />
-        </Card>
+        <View style={styles.actions}>
+          <Action icon="add-circle" label="New order" solid tone={accents.cobalt} onPress={() => navigation.navigate("NewOrder")} />
+          <Action icon="storefront" label="Shop visit" tone={accents.green} onPress={() => navigation.navigate("Visits")} />
+          <Action icon="pricetags" label="Price list" tone={accents.terracotta} onPress={() => navigation.navigate("Catalog")} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+type Tone = { strong: string; soft: string };
+type IconName = React.ComponentProps<typeof Ionicons>["name"];
+
+function Stat({ icon, tone, label, value }: { icon: IconName; tone: Tone; label: string; value: string }) {
   return (
     <View style={styles.stat}>
+      <View style={[styles.statIcon, { backgroundColor: tone.soft }]}>
+        <Ionicons name={icon} size={16} color={tone.strong} />
+      </View>
       <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
@@ -157,22 +161,29 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+// A square button. The main action is solid; the rest use a soft tint.
 function Action({
   icon,
   label,
+  tone,
+  solid = false,
   onPress,
 }: {
-  icon: React.ComponentProps<typeof Ionicons>["name"];
+  icon: IconName;
   label: string;
+  tone: Tone;
+  solid?: boolean;
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity activeOpacity={0.6} style={styles.action} onPress={onPress}>
-      <View style={styles.actionIcon}>
-        <Ionicons name={icon} size={20} color={colors.text} />
-      </View>
-      <Text style={styles.actionLabel}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+    <TouchableOpacity
+      activeOpacity={0.75}
+      style={[styles.action, { backgroundColor: solid ? tone.strong : tone.soft }]}
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <Ionicons name={icon} size={28} color={solid ? "#fff" : tone.strong} />
+      <Text style={[styles.actionLabel, { color: solid ? "#fff" : tone.strong }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -197,25 +208,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   duty: { gap: 10, padding: 18 },
+  dutyOn: { backgroundColor: accents.green.soft, borderColor: "#bfe0cd" },
   dutyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { width: 9, height: 9, borderRadius: 5 },
   dutyTitle: { fontSize: 18, fontWeight: "700", color: colors.text },
   dutyHint: { fontSize: 14, color: colors.textMuted, marginBottom: 4 },
   stats: { flexDirection: "row", padding: 0 },
-  stat: { flex: 1, paddingVertical: 16, paddingHorizontal: 12, gap: 2 },
+  stat: { flex: 1, paddingVertical: 14, paddingHorizontal: 12, gap: 4 },
+  statIcon: { width: 28, height: 28, borderRadius: radius.sm, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 12 },
   statValue: { fontSize: 20, fontWeight: "700", color: colors.text },
   statLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
-  actions: { padding: 0 },
-  action: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14, paddingHorizontal: 16 },
-  actionDivider: { height: 1, backgroundColor: colors.border, marginLeft: 66 },
-  actionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
+  actions: { flexDirection: "row", gap: 10 },
+  action: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
+    paddingVertical: 20,
+    borderRadius: radius.md,
   },
-  actionLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.text },
+  actionLabel: { fontSize: 14, fontWeight: "700" },
 });
