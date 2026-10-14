@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
 
 // Where the app sends requests. Tucked away at the bottom of the login screen
 // for setting up test devices; field staff never need it.
-function ServerSetting() {
+export function ServerSetting() {
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [draft, setDraft] = useState("");

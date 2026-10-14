@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { useDuty } from "../context/DutyContext";
 import { api } from "../lib/api";
 import { Card, SectionLabel } from "../components/ui";
+import { ServerSetting } from "./LoginScreen";
 import { colors, formatTime, radius } from "../theme";
 
 interface DutyStatus {
@@ -134,6 +135,8 @@ export default function ProfileScreen() {
           ) : null}
           <Row icon="log-out-outline" label="Log out" onPress={confirmLogout} />
         </Card>
+
+        <ServerSetting />
 
         <Text style={styles.footnote}>
           Duty start and end times are recorded and visible to the office.

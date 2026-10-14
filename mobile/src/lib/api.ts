@@ -47,6 +47,23 @@ export async function canReachServer(url: string): Promise<boolean> {
   }
 }
 
+// A request to an unreachable address (wrong network, server down) would
+// otherwise hang for minutes, leaving the app stuck on its loading spinner.
+const REQUEST_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) throw new Error("Can't reach the server. Check your connection or the server address.");
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const ACCESS_KEY = "pt_access_token";
 const REFRESH_KEY = "pt_refresh_token";
 
@@ -71,7 +88,7 @@ export async function clearTokens() {
 async function tryRefresh(): Promise<string | null> {
   const refreshToken = await getRefreshToken();
   if (!refreshToken) return null;
-  const res = await fetch(`${await getApiUrl()}/api/auth/refresh`, {
+  const res = await fetchWithTimeout(`${await getApiUrl()}/api/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken }),
@@ -96,7 +113,7 @@ export class SessionExpiredError extends Error {
 
 export async function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   const token = await getAccessToken();
-  const res = await fetch(`${await getApiUrl()}${path}`, {
+  const res = await fetchWithTimeout(`${await getApiUrl()}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
