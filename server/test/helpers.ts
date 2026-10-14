@@ -86,6 +86,14 @@ export async function seedFixtures() {
 
 export type Fixtures = Awaited<ReturnType<typeof seedFixtures>>;
 
+// Orders and visits need the employee on duty. Sets the flag directly, without
+// a duty session, for tests that are not about duty itself.
+export async function putOnDuty(...userIds: string[]) {
+  await prisma.employeeLocation.createMany({
+    data: userIds.map((userId) => ({ userId, lat: 13.05, lng: 80.25, onDuty: true })),
+  });
+}
+
 export async function login(phone: string, password = PASSWORD) {
   const res = await api().post("/api/auth/login").send({ phone, password });
   if (res.status !== 200) throw new Error(`login ${phone} failed: ${res.status} ${JSON.stringify(res.body)}`);

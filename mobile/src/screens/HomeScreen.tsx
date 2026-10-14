@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import {
+  Alert,
   Image,
   RefreshControl,
   ScrollView,
@@ -19,7 +20,7 @@ import { api } from "../lib/api";
 import type { Order, Visit } from "../lib/types";
 import type { RootStackParamList, TabParamList } from "../navigation/types";
 import { Button, Card, SectionLabel } from "../components/ui";
-import { accents, colors, formatINR, radius } from "../theme";
+import { colors, formatINR, radius } from "../theme";
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList, "Home">,
@@ -74,6 +75,14 @@ export default function HomeScreen() {
     }, [loadStats])
   );
 
+  function newOrder() {
+    if (!onDuty) {
+      Alert.alert("You're off duty", "Start duty to take orders.");
+      return;
+    }
+    navigation.navigate("NewOrder");
+  }
+
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
   return (
@@ -90,23 +99,25 @@ export default function HomeScreen() {
           />
         }
       >
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
+        <View style={styles.hero}>
+          <View style={styles.heroTop}>
+            <View style={styles.logoPlate}>
+              <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
+            </View>
             <TouchableOpacity style={styles.logout} onPress={logout} accessibilityLabel="Log out">
-              <Ionicons name="log-out-outline" size={22} color={colors.textMuted} />
+              <Ionicons name="log-out-outline" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
           <Text style={styles.date}>{today}</Text>
           <Text style={styles.greeting}>
             {greeting()}, {user?.name?.split(" ")[0]}
           </Text>
-          <Text style={styles.district}>
-            {[user?.employeeCode, user?.district?.name ?? "No district assigned"].filter(Boolean).join("  ·  ")}
+          <Text style={styles.meta}>
+            {[user?.employeeCode, user?.district?.name ?? "No district assigned"].filter(Boolean).join("   ·   ")}
           </Text>
         </View>
 
-        <Card style={[styles.duty, onDuty && styles.dutyOn]}>
+        <Card style={styles.duty}>
           <View style={styles.dutyRow}>
             <View style={[styles.dot, { backgroundColor: onDuty ? colors.success : colors.textFaint }]} />
             <Text style={styles.dutyTitle}>{onDuty ? "On duty" : "Off duty"}</Text>
@@ -114,7 +125,7 @@ export default function HomeScreen() {
           <Text style={styles.dutyHint}>
             {onDuty
               ? "Your location is being shared with the office."
-              : "Start duty to share your location and log shop visits."}
+              : "Start duty to take orders, log shop visits and share your location."}
           </Text>
           <Button
             label={onDuty ? "Go off duty" : "Start duty"}
@@ -126,107 +137,105 @@ export default function HomeScreen() {
 
         <SectionLabel>Today</SectionLabel>
         <Card style={styles.stats}>
-          <Stat icon="receipt-outline" tone={accents.cobalt} label="Orders" value={stats ? String(stats.orders) : "–"} />
+          <Stat label="Orders" value={stats ? String(stats.orders) : "–"} />
           <View style={styles.statDivider} />
-          <Stat icon="cash-outline" tone={accents.green} label="Sales" value={stats ? formatINR(stats.sales) : "–"} />
+          <Stat label="Sales" value={stats ? formatINR(stats.sales) : "–"} />
           <View style={styles.statDivider} />
-          <Stat icon="storefront-outline" tone={accents.terracotta} label="Visits" value={stats ? String(stats.visits) : "–"} />
+          <Stat label="Visits" value={stats ? String(stats.visits) : "–"} />
         </Card>
 
         <SectionLabel>Quick actions</SectionLabel>
+        <TouchableOpacity activeOpacity={0.85} style={styles.primaryAction} onPress={newOrder} accessibilityRole="button">
+          <Ionicons name="add" size={22} color="#fff" />
+          <Text style={styles.primaryActionText}>New order</Text>
+        </TouchableOpacity>
         <View style={styles.actions}>
-          <Action icon="add-circle" label="New order" solid tone={accents.cobalt} onPress={() => navigation.navigate("NewOrder")} />
-          <Action icon="storefront" label="Shop visit" tone={accents.green} onPress={() => navigation.navigate("Visits")} />
-          <Action icon="pricetags" label="Price list" tone={accents.terracotta} onPress={() => navigation.navigate("Catalog")} />
+          <Action icon="storefront-outline" label="Shop visit" onPress={() => navigation.navigate("Visits")} />
+          <Action icon="pricetags-outline" label="Price list" onPress={() => navigation.navigate("Catalog")} />
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-type Tone = { strong: string; soft: string };
-type IconName = React.ComponentProps<typeof Ionicons>["name"];
-
-function Stat({ icon, tone, label, value }: { icon: IconName; tone: Tone; label: string; value: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat}>
-      <View style={[styles.statIcon, { backgroundColor: tone.soft }]}>
-        <Ionicons name={icon} size={16} color={tone.strong} />
-      </View>
+      <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
-      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
-// A square button. The main action is solid; the rest use a soft tint.
 function Action({
   icon,
   label,
-  tone,
-  solid = false,
   onPress,
 }: {
-  icon: IconName;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
   label: string;
-  tone: Tone;
-  solid?: boolean;
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity
-      activeOpacity={0.75}
-      style={[styles.action, { backgroundColor: solid ? tone.strong : tone.soft }]}
-      onPress={onPress}
-      accessibilityRole="button"
-    >
-      <Ionicons name={icon} size={28} color={solid ? "#fff" : tone.strong} />
-      <Text style={[styles.actionLabel, { color: solid ? "#fff" : tone.strong }]}>{label}</Text>
+    <TouchableOpacity activeOpacity={0.7} style={styles.action} onPress={onPress} accessibilityRole="button">
+      <Ionicons name={icon} size={22} color={colors.primary} />
+      <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  container: { padding: 20, gap: 14, paddingBottom: 32 },
-  header: { paddingTop: 4, paddingBottom: 6 },
-  headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
-  logo: { width: 104, height: 36 },
-  date: { fontSize: 13, color: colors.textMuted, fontWeight: "500" },
-  greeting: { fontSize: 24, fontWeight: "700", color: colors.text, marginTop: 2 },
-  district: { fontSize: 14, color: colors.textMuted, marginTop: 4 },
+  container: { padding: 16, gap: 14, paddingBottom: 32 },
+  hero: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: 20, paddingTop: 16 },
+  heroTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
+  logoPlate: { backgroundColor: "#fff", borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 4 },
+  logo: { width: 84, height: 28 },
   logout: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
   },
+  date: { fontSize: 13, color: "rgba(255,255,255,0.72)", fontWeight: "500" },
+  greeting: { fontSize: 24, fontWeight: "700", color: "#fff", marginTop: 4 },
+  meta: { fontSize: 14, color: "rgba(255,255,255,0.72)", marginTop: 6, fontWeight: "500" },
   duty: { gap: 10, padding: 18 },
-  dutyOn: { backgroundColor: accents.green.soft, borderColor: "#bfe0cd" },
   dutyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { width: 9, height: 9, borderRadius: 5 },
-  dutyTitle: { fontSize: 18, fontWeight: "700", color: colors.text },
-  dutyHint: { fontSize: 14, color: colors.textMuted, marginBottom: 4 },
+  dutyTitle: { fontSize: 17, fontWeight: "700", color: colors.text },
+  dutyHint: { fontSize: 14, color: colors.textMuted, marginBottom: 4, lineHeight: 20 },
   stats: { flexDirection: "row", padding: 0 },
-  stat: { flex: 1, paddingVertical: 14, paddingHorizontal: 12, gap: 4 },
-  statIcon: { width: 28, height: 28, borderRadius: radius.sm, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 12 },
-  statValue: { fontSize: 20, fontWeight: "700", color: colors.text },
-  statLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
-  actions: { flexDirection: "row", gap: 10 },
-  action: {
-    flex: 1,
+  stat: { flex: 1, paddingVertical: 16, paddingHorizontal: 14, gap: 6 },
+  statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 14 },
+  statLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600", letterSpacing: 0.3 },
+  statValue: { fontSize: 22, fontWeight: "700", color: colors.text },
+  primaryAction: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 20,
+    minHeight: 54,
     borderRadius: radius.md,
+    backgroundColor: colors.primary,
   },
-  actionLabel: { fontSize: 14, fontWeight: "700" },
+  primaryActionText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  actions: { flexDirection: "row", gap: 12 },
+  action: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 54,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  actionLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
 });

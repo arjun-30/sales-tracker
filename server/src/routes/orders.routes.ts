@@ -33,9 +33,17 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
   const { customerName, customerPhone, shopName, notes, lat, lng, items } = parsed.data;
   const employeeId = req.user!.sub;
 
-  const employee = await prisma.user.findUnique({ where: { id: employeeId } });
+  const employee = await prisma.user.findUnique({
+    where: { id: employeeId },
+    include: { employeeLocation: { select: { onDuty: true } } },
+  });
   if (!employee?.districtId) {
     return res.status(400).json({ error: "Employee has no district assigned" });
+  }
+  // Orders are field work: they count towards the working day and are placed
+  // where the employee is, so they can only be taken on duty.
+  if (!employee.employeeLocation?.onDuty) {
+    return res.status(409).json({ error: "Start duty before taking an order." });
   }
 
   const variantIds = items.map((i) => i.variantId);

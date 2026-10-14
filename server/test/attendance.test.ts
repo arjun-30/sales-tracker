@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../src/db";
 import { sweepStaleDuty } from "../src/lib/dutySweep";
 import { normalizeEmployeeCode, workedByDay } from "../src/lib/attendance";
-import { api, bearer, ensureSocket, login, resetDb, seedFixtures, type Fixtures } from "./helpers";
+import { api, bearer, ensureSocket, login, putOnDuty, resetDb, seedFixtures, type Fixtures } from "./helpers";
 
 // IST is UTC+5:30, so 09:00 IST is 03:30 UTC.
 const ist = (date: string, time: string) => new Date(`${date}T${time}:00+05:30`);
@@ -201,6 +201,7 @@ describe("order and report logic", () => {
   beforeEach(async () => {
     await resetDb();
     f = await seedFixtures();
+    await putOnDuty(f.empA.id);
     admin = (await login("9999999999")).accessToken;
     empA = (await login("9000000001")).accessToken;
   });

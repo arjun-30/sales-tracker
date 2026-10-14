@@ -16,6 +16,7 @@ import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../lib/api";
+import { useDuty } from "../context/DutyContext";
 import { getCurrentPosition } from "../lib/locationTask";
 import type { Order, Product } from "../lib/types";
 import type { RootStackParamList } from "../navigation/types";
@@ -32,6 +33,7 @@ interface CartLine {
 }
 
 export default function NewOrderScreen() {
+  const { onDuty, busy: dutyBusy, toggleDuty } = useDuty();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [code, setCode] = useState("");
   const [looking, setLooking] = useState(false);
@@ -135,6 +137,21 @@ export default function NewOrderScreen() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // The server refuses orders from anyone off duty; say so up front instead
+  // of letting them fill in an order that can't be sent.
+  if (!onDuty) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["bottom"]}>
+        <View style={styles.offDuty}>
+          <Ionicons name="time-outline" size={36} color={colors.textMuted} />
+          <Text style={styles.offDutyTitle}>You're off duty</Text>
+          <Text style={styles.offDutyText}>Start duty to take orders. Orders are recorded against your working day.</Text>
+          <Button label="Start duty" onPress={toggleDuty} loading={dutyBusy} style={{ alignSelf: "stretch" }} />
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -298,6 +315,9 @@ function Stepper({
 }
 
 const styles = StyleSheet.create({
+  offDuty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 32 },
+  offDutyTitle: { fontSize: 20, fontWeight: "700", color: colors.text },
+  offDutyText: { fontSize: 15, color: colors.textMuted, textAlign: "center", marginBottom: 12 },
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, gap: 12, paddingBottom: 32 },
   section: { gap: 12 },

@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../src/db";
-import { api, bearer, login, resetDb, seedFixtures, type Fixtures } from "./helpers";
+import { api, bearer, login, putOnDuty, resetDb, seedFixtures, type Fixtures } from "./helpers";
 
 let f: Fixtures;
 let empA: string;
@@ -8,6 +8,7 @@ let empB: string;
 beforeEach(async () => {
   await resetDb();
   f = await seedFixtures();
+  await putOnDuty(f.empA.id, f.empB.id);
   empA = (await login("9000000001")).accessToken;
   empB = (await login("9000000002")).accessToken;
 });

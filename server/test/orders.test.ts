@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../src/db";
-import { api, bearer, login, resetDb, seedFixtures, type Fixtures } from "./helpers";
+import { api, bearer, login, putOnDuty, resetDb, seedFixtures, type Fixtures } from "./helpers";
 
 let f: Fixtures;
 let emp: string;
@@ -8,10 +8,20 @@ let admin: string;
 beforeEach(async () => {
   await resetDb();
   f = await seedFixtures();
+  await putOnDuty(f.empA.id);
   emp = (await login("9000000001")).accessToken;
   admin = (await login("9999999999")).accessToken;
 });
 afterAll(() => prisma.$disconnect());
+
+describe("duty", () => {
+  it("an employee who is off duty can't take an order", async () => {
+    await prisma.employeeLocation.update({ where: { userId: f.empA.id }, data: { onDuty: false } });
+    const res = await placeOrder([{ variantId: f.v1L.id, quantity: 1 }]);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/start duty/i);
+  });
+});
 
 const placeOrder = (items: unknown, extra: Record<string, unknown> = {}) =>
   api().post("/api/orders").set(bearer(emp)).send({ customerName: "Lakshmi Hardware", items, ...extra });
