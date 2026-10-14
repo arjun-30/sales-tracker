@@ -2,7 +2,50 @@ import * as SecureStore from "expo-secure-store";
 
 // Android emulator reaches the host machine at 10.0.2.2; a physical device on
 // the same Wi-Fi needs the machine's LAN IP instead. Override via EXPO_PUBLIC_API_URL.
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://10.0.2.2:4000";
+export const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://10.0.2.2:4000";
+
+// A test server's address changes with the network it is on, so the login
+// screen lets you point the app elsewhere without a rebuild. Saved on the phone.
+const SERVER_KEY = "pt_server_url";
+let cachedApiUrl: string | null = null;
+
+export async function getApiUrl(): Promise<string> {
+  const url = cachedApiUrl ?? ((await SecureStore.getItemAsync(SERVER_KEY)) || DEFAULT_API_URL);
+  cachedApiUrl = url;
+  return url;
+}
+
+// "192.168.1.5" → "http://192.168.1.5:4010"; full URLs are kept as typed.
+export function normalizeServerUrl(input: string): string {
+  let url = input.trim().replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
+  if (/^http:\/\/[\d.]+$/.test(url)) url = `${url}:4010`;
+  return url;
+}
+
+export async function setApiUrl(input: string | null) {
+  if (!input || !input.trim()) {
+    await SecureStore.deleteItemAsync(SERVER_KEY);
+  } else {
+    await SecureStore.setItemAsync(SERVER_KEY, normalizeServerUrl(input));
+  }
+  cachedApiUrl = null;
+}
+
+// True when something answering like our API is at `url` (any HTTP reply counts;
+// an unauthenticated request is expected to get 401).
+export async function canReachServer(url: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`${url}/api/districts`, { signal: controller.signal });
+    return res.status === 401 || res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const ACCESS_KEY = "pt_access_token";
 const REFRESH_KEY = "pt_refresh_token";
@@ -28,7 +71,7 @@ export async function clearTokens() {
 async function tryRefresh(): Promise<string | null> {
   const refreshToken = await getRefreshToken();
   if (!refreshToken) return null;
-  const res = await fetch(`${API_URL}/api/auth/refresh`, {
+  const res = await fetch(`${await getApiUrl()}/api/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken }),
@@ -53,7 +96,7 @@ export class SessionExpiredError extends Error {
 
 export async function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   const token = await getAccessToken();
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${await getApiUrl()}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",

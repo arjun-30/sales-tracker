@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useAuth } from "../context/AuthContext";
+import { canReachServer, getApiUrl, normalizeServerUrl, setApiUrl } from "../lib/api";
 import { colors, radius } from "../theme";
 
 const PHONE_LENGTH = 10;
@@ -166,6 +167,8 @@ export default function LoginScreen() {
             <Ionicons name="help-circle-outline" size={16} color={colors.textFaint} />
             <Text style={styles.helpText}>Forgot your password? Ask your manager to reset it.</Text>
           </View>
+
+          <ServerSetting />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -238,4 +241,110 @@ const styles = StyleSheet.create({
   submitText: { color: "#fff", fontSize: 17, fontWeight: "800" },
   help: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   helpText: { color: colors.textFaint, fontSize: 13 },
+  serverLink: { alignItems: "center", paddingVertical: 6 },
+  serverLinkText: { color: colors.textFaint, fontSize: 12 },
+  serverBox: {
+    gap: 10,
+    padding: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  serverLabel: { fontSize: 13, fontWeight: "700", color: colors.text },
+  serverInput: {
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: colors.text,
+  },
+  serverActions: { flexDirection: "row", gap: 10 },
+  serverButton: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 11,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  serverButtonPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  serverButtonText: { fontSize: 14, fontWeight: "700", color: colors.text },
+  serverStatus: { fontSize: 13, fontWeight: "600" },
 });
+
+// Where the app sends requests. Tucked away at the bottom of the login screen
+// for setting up test devices; field staff never need it.
+function ServerSetting() {
+  const [open, setOpen] = useState(false);
+  const [current, setCurrent] = useState("");
+  const [draft, setDraft] = useState("");
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getApiUrl().then((url) => {
+      setCurrent(url);
+      setDraft(url.replace(/^http:\/\//, ""));
+    });
+  }, []);
+
+  async function test() {
+    setBusy(true);
+    const url = normalizeServerUrl(draft);
+    const ok = await canReachServer(url);
+    setStatus(ok ? { ok, text: `Connected to ${url}` } : { ok, text: `Can't reach ${url}` });
+    setBusy(false);
+    return ok;
+  }
+
+  async function save() {
+    await setApiUrl(draft);
+    const url = await getApiUrl();
+    setCurrent(url);
+    setStatus({ ok: true, text: `Saved. The app now uses ${url}` });
+  }
+
+  if (!open) {
+    return (
+      <TouchableOpacity style={styles.serverLink} onPress={() => setOpen(true)}>
+        <Text style={styles.serverLinkText}>Server: {current.replace(/^https?:\/\//, "")} · Change</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View style={styles.serverBox}>
+      <Text style={styles.serverLabel}>Server address</Text>
+      <TextInput
+        style={styles.serverInput}
+        value={draft}
+        onChangeText={(t) => {
+          setDraft(t);
+          setStatus(null);
+        }}
+        placeholder="192.168.1.5:4010"
+        placeholderTextColor={colors.textFaint}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="url"
+      />
+      {status ? (
+        <Text style={[styles.serverStatus, { color: status.ok ? colors.success : colors.danger }]}>{status.text}</Text>
+      ) : null}
+      <View style={styles.serverActions}>
+        <TouchableOpacity style={styles.serverButton} onPress={test} disabled={busy}>
+          {busy ? <ActivityIndicator color={colors.text} /> : <Text style={styles.serverButtonText}>Test</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.serverButton, styles.serverButtonPrimary]} onPress={save} disabled={busy}>
+          <Text style={[styles.serverButtonText, { color: "#fff" }]}>Save</Text>
+        </TouchableOpacity>
+      </View>
+      <TouchableOpacity onPress={() => setOpen(false)} style={{ alignItems: "center" }}>
+        <Text style={styles.serverLinkText}>Close</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
