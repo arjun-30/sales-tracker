@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
@@ -27,6 +27,10 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { onDuty, busy, toggleDuty } = useDuty();
   const [status, setStatus] = useState<DutyStatus | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  // Android can open this screen part-way down (the slide-in animation lays it
+  // out under the header first), so always start at the top.
+  const toTop = useCallback(() => scrollRef.current?.scrollTo({ y: 0, animated: false }), []);
 
   const load = useCallback(() => {
     api<DutyStatus>("/api/tracking/me")
@@ -37,7 +41,8 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load, onDuty])
+      toTop();
+    }, [load, onDuty, toTop])
   );
 
   const initials = (user?.name ?? "?")
@@ -76,7 +81,12 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.container}
+        contentOffset={{ x: 0, y: 0 }}
+        onLayout={toTop}
+      >
         <View style={styles.identity}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initials}</Text>
