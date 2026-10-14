@@ -98,7 +98,7 @@ export default function HomeScreen() {
 
   function openMenu() {
     if (onDuty) {
-      Alert.alert("Menu", undefined, [
+      Alert.alert(user?.name ?? "Account", user?.employeeCode ?? undefined, [
         { text: "End duty", onPress: confirmEndDuty },
         {
           text: "Log out",
@@ -108,12 +108,20 @@ export default function HomeScreen() {
         { text: "Close", style: "cancel" },
       ]);
     } else {
-      Alert.alert("Menu", undefined, [
+      Alert.alert(user?.name ?? "Account", user?.employeeCode ?? undefined, [
         { text: "Log out", onPress: logout },
         { text: "Close", style: "cancel" },
       ]);
     }
   }
+
+  const initials = (user?.name ?? "?")
+    .split(" ")
+    .filter(Boolean)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
@@ -133,8 +141,8 @@ export default function HomeScreen() {
       >
         <View style={styles.headerTop}>
           <Image source={require("../../assets/roalux-logo.png")} style={styles.logo} resizeMode="contain" />
-          <TouchableOpacity style={styles.menu} onPress={openMenu} accessibilityLabel="Menu">
-            <Ionicons name="ellipsis-horizontal" size={20} color={colors.text} />
+          <TouchableOpacity style={styles.avatar} onPress={openMenu} accessibilityLabel="Account menu">
+            <Text style={styles.avatarText}>{initials}</Text>
           </TouchableOpacity>
         </View>
 
@@ -177,7 +185,7 @@ export default function HomeScreen() {
         </Card>
 
         <SectionLabel>Quick actions</SectionLabel>
-        <Action icon="add" label="New order" primary={onDuty} onPress={newOrder} />
+        <Action icon="bag-add-outline" label="New order" primary={onDuty} onPress={newOrder} />
         <View style={styles.actions}>
           <Action icon="storefront-outline" label="Shop visit" onPress={() => navigation.navigate("Visits")} />
           <Action icon="pricetags-outline" label="Price list" onPress={() => navigation.navigate("Catalog")} />
@@ -228,16 +236,15 @@ const styles = StyleSheet.create({
   container: { padding: 16, gap: 14, paddingBottom: 32 },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   logo: { width: 92, height: 32 },
-  menu: {
+  avatar: {
     width: 40,
     height: 40,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderRadius: 20,
+    backgroundColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
+  avatarText: { fontSize: 14, fontWeight: "700", color: colors.text, letterSpacing: 0.5 },
   header: { marginTop: 6, marginBottom: 2 },
   date: { fontSize: 13, color: colors.textMuted, fontWeight: "500" },
   greeting: { fontSize: 24, fontWeight: "700", color: colors.text, marginTop: 4 },
