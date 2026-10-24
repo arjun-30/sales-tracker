@@ -50,10 +50,12 @@ export async function canReachServer(url: string): Promise<boolean> {
 // A request to an unreachable address (wrong network, server down) would
 // otherwise hang for minutes, leaving the app stuck on its loading spinner.
 const REQUEST_TIMEOUT_MS = 15000;
+// An order with a voice note uploads a file, which takes longer on weak signal.
+const UPLOAD_TIMEOUT_MS = 90000;
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), init.body instanceof FormData ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (err) {
@@ -113,10 +115,12 @@ export class SessionExpiredError extends Error {
 
 export async function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   const token = await getAccessToken();
+  // A FormData body (an order with a voice note) sets its own multipart type.
+  const isForm = options.body instanceof FormData;
   const res = await fetchWithTimeout(`${await getApiUrl()}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isForm ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },

@@ -37,12 +37,31 @@ export interface Product {
   variants: ProductVariant[];
 }
 
+// A catalogue size, or (variantId null) a custom size priced at the shop:
+// customSize of `product`, or of a product only named in customName.
 export interface OrderItem {
   id: string;
-  variantId: string;
+  variantId: string | null;
   quantity: number;
   unitPrice: number;
-  variant: ProductVariant & { product: Product };
+  variant: (ProductVariant & { product: Product }) | null;
+  product: Product | null;
+  customName: string | null;
+  customSize: string | null;
+}
+
+export interface Store {
+  id: string;
+  name: string;
+  ownerName: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  lat: number;
+  lng: number;
+  // A shop a salesperson added waits for the office before others see it.
+  status: "pending" | "approved";
+  createdBy: { id: string; name: string } | null;
 }
 
 export type OrderStatus = "pending" | "confirmed" | "delivered" | "cancelled";
@@ -61,6 +80,10 @@ export interface Order {
   lng: number | null;
   createdAt: string;
   items: OrderItem[];
+  voiceNote: { durationMs: number | null } | null;
+  channel: "in_person" | "phone";
+  storeId: string | null;
+  distanceFromStoreM: number | null;
 }
 
 export interface Visit {

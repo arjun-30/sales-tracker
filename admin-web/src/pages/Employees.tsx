@@ -314,7 +314,7 @@ export function Employees() {
                             to={`/attendance?code=${emp.employeeCode}`}
                             className="inline-flex h-8 items-center rounded-md border border-neutral-300 bg-white px-2.5 text-[13px] font-medium text-neutral-800 hover:border-neutral-400 hover:bg-neutral-50"
                           >
-                            Attendance
+                            History
                           </Link>
                         ) : null}
                         <Button size="sm" variant="ghost" onClick={() => resetPassword(emp)}>

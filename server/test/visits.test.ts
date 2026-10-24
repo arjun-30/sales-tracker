@@ -16,7 +16,7 @@ beforeEach(async () => {
 afterAll(() => prisma.$disconnect());
 
 const goOnDuty = (token: string, onDuty: boolean) =>
-  api().post("/api/tracking/duty").set(bearer(token)).send({ onDuty, lat: 13.05, lng: 80.25 });
+  api().post("/api/tracking/duty").set(bearer(token)).send({ onDuty, employeeCode: token === empA ? "RLX-CHN-001" : "RLX-MDU-001", lat: 13.05, lng: 80.25 });
 
 const checkIn = (token: string, shopName = "Sri Murugan Paints") =>
   api()

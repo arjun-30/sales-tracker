@@ -54,17 +54,8 @@ export default function ProfileScreen() {
     .join("")
     .toUpperCase();
 
-  // Ending duty stops the working-hours clock, so it is confirmed first.
-  function confirmEndDuty() {
-    Alert.alert(
-      "End duty for today?",
-      "Your working hours stop counting from now and the office will see you as off duty.",
-      [
-        { text: "Keep working", style: "cancel" },
-        { text: "End duty", style: "destructive", onPress: toggleDuty },
-      ]
-    );
-  }
+  // Ending duty stops the working-hours clock; the employee-code prompt confirms it.
+  const confirmEndDuty = toggleDuty;
 
   function confirmLogout() {
     if (onDuty) {

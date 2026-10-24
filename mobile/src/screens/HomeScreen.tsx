@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   RefreshControl,
@@ -17,9 +18,11 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
 import { useDuty } from "../context/DutyContext";
 import { api } from "../lib/api";
-import type { Order, Visit } from "../lib/types";
+import { getCurrentPosition } from "../lib/locationTask";
+import type { Order, Store, Visit } from "../lib/types";
 import type { RootStackParamList, TabParamList } from "../navigation/types";
 import { Button, Card, SectionLabel } from "../components/ui";
+import { StoreMap } from "../components/StoreMap";
 import { colors, formatINR, radius } from "../theme";
 
 type Nav = CompositeNavigationProp<
@@ -45,7 +48,20 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { onDuty, busy, toggleDuty } = useDuty();
   const [stats, setStats] = useState<TodayStats | null>(null);
+  const [stores, setStores] = useState<Store[] | null>(null);
+  const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // The plant's shops for the map, and where the salesperson is now.
+  const loadStores = useCallback(async () => {
+    try {
+      const [s, pos] = await Promise.all([api<{ stores: Store[] }>("/api/stores"), getCurrentPosition()]);
+      setStores(s.stores);
+      if (pos) setMe(pos);
+    } catch {
+      setStores((prev) => prev ?? []);
+    }
+  }, []);
 
   const loadStats = useCallback(async () => {
     const start = new Date();
@@ -72,7 +88,8 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       loadStats();
-    }, [loadStats])
+      loadStores();
+    }, [loadStats, loadStores])
   );
 
   function newOrder() {
@@ -103,6 +120,7 @@ export default function HomeScreen() {
             onRefresh={() => {
               setRefreshing(true);
               loadStats();
+              loadStores();
             }}
           />
         }
@@ -162,6 +180,12 @@ export default function HomeScreen() {
           <Action icon="storefront-outline" label="Shop visit" onPress={() => navigation.navigate("Visits")} />
           <Action icon="pricetags-outline" label="Price list" onPress={() => navigation.navigate("Catalog")} />
         </View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionLabel>{stores && stores.length > 0 ? `Shops · ${stores.length}` : "Shops"}</SectionLabel>
+          {stores ? <StoreMap stores={stores} me={me} /> : <Card style={styles.mapLoading}><ActivityIndicator color={colors.textMuted} /></Card>}
+          <Action icon="add-circle-outline" label="Add the shop I'm in" onPress={() => navigation.navigate("AddStore")} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -251,4 +275,5 @@ const styles = StyleSheet.create({
   },
   actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
   actionLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
+  mapLoading: { height: 240, alignItems: "center", justifyContent: "center" },
 });

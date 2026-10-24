@@ -7,6 +7,7 @@ import { requireAdmin, requireAuth } from "../middleware/auth";
 import { emitToAdmins } from "../socket";
 import { endDutyNow } from "../lib/duty";
 import { HttpError, plantFilter, targetPlantId } from "../lib/scope";
+import { distanceM } from "../lib/geo";
 import {
   employeeCode,
   istStartOfDay,
@@ -137,6 +138,94 @@ employeesRouter.get("/code/:code/attendance", async (req, res) => {
       sales: orderAgg._sum.totalAmount?.toNumber() ?? 0,
       visits: visitCount,
     },
+  });
+});
+
+// A stay this long in one spot is a stop worth showing on the day's route.
+const STOP_MIN_MINUTES = 15;
+const STOP_RADIUS_M = 150;
+// Enough points to draw a day's route smoothly without a huge response.
+const ROUTE_MAX_POINTS = 1500;
+
+type Ping = { lat: number; lng: number; recordedAt: Date };
+
+// Places the employee stayed at least STOP_MIN_MINUTES, from consecutive pings
+// that stay within STOP_RADIUS_M of where the stay began.
+function findStops(pings: Ping[]) {
+  const stops: { lat: number; lng: number; from: Date; to: Date; minutes: number }[] = [];
+  let start = 0;
+  for (let i = 1; i <= pings.length; i++) {
+    const left = i === pings.length || distanceM(pings[start], pings[i]) > STOP_RADIUS_M;
+    if (!left) continue;
+    const from = pings[start].recordedAt;
+    const to = pings[i - 1].recordedAt;
+    const minutes = Math.round((to.getTime() - from.getTime()) / 60000);
+    if (minutes >= STOP_MIN_MINUTES) stops.push({ lat: pings[start].lat, lng: pings[start].lng, from, to, minutes });
+    start = i;
+  }
+  return stops;
+}
+
+const routeQuery = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD") });
+
+// One employee's day (Indian time): the route their phone reported, where they
+// stopped and for how long, and the orders and shop visits along the way.
+employeesRouter.get("/code/:code/route", async (req, res) => {
+  const code = normalizeEmployeeCode(req.params.code);
+  if (!code) return res.status(400).json({ error: "Employee codes look like RLX-CHN-001" });
+  const parsed = routeQuery.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message });
+
+  const employee = await prisma.user.findFirst({
+    where: { employeeCode: code, role: "sales_employee", ...plantFilter(req) },
+    select: { id: true },
+  });
+  if (!employee) return res.status(404).json({ error: `No employee with code ${code}` });
+
+  const from = new Date(`${parsed.data.date}T00:00:00+05:30`);
+  const to = new Date(from.getTime() + 24 * 60 * 60 * 1000);
+
+  const [pings, orders, visits] = await Promise.all([
+    prisma.locationHistory.findMany({
+      where: { userId: employee.id, recordedAt: { gte: from, lt: to } },
+      orderBy: { recordedAt: "asc" },
+      select: { lat: true, lng: true, recordedAt: true },
+    }),
+    prisma.order.findMany({
+      where: { employeeId: employee.id, createdAt: { gte: from, lt: to } },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        customerName: true,
+        shopName: true,
+        totalAmount: true,
+        status: true,
+        channel: true,
+        distanceFromStoreM: true,
+        lat: true,
+        lng: true,
+        createdAt: true,
+      },
+    }),
+    prisma.visit.findMany({
+      where: { employeeId: employee.id, checkInAt: { gte: from, lt: to } },
+      orderBy: { checkInAt: "asc" },
+      select: { id: true, shopName: true, checkInAt: true, checkOutAt: true, checkInLat: true, checkInLng: true },
+    }),
+  ]);
+
+  const step = Math.max(1, Math.ceil(pings.length / ROUTE_MAX_POINTS));
+  const points = pings.filter((_, i) => i % step === 0 || i === pings.length - 1);
+  let distance = 0;
+  for (let i = 1; i < pings.length; i++) distance += distanceM(pings[i - 1], pings[i]);
+
+  res.json({
+    date: parsed.data.date,
+    points: points.map((p) => ({ lat: p.lat, lng: p.lng, at: p.recordedAt })),
+    stops: findStops(pings),
+    distanceKm: Math.round(distance / 100) / 10,
+    orders,
+    visits,
   });
 });
 

@@ -33,6 +33,8 @@ export interface Store {
   lat: number;
   lng: number;
   notes: string | null;
+  // A shop a salesperson added from the field waits for approval.
+  status: "pending" | "approved";
   createdAt: string;
   plant: PlantRef;
   createdBy: { id: string; name: string } | null;
@@ -78,6 +80,8 @@ export interface EmployeeLocation {
   lng: number;
   accuracy: number | null;
   onDuty: boolean;
+  // Since when the employee has stayed in one spot (null when off duty).
+  stationarySince: string | null;
   updatedAt: string;
   user?: {
     id: string;
@@ -112,12 +116,17 @@ export interface Product {
   variants: ProductVariant[];
 }
 
+// A catalogue size, or (variantId null) a custom size the salesperson
+// described and priced at the shop: of `product`, or of one named in customName.
 export interface OrderItem {
   id: string;
-  variantId: string;
+  variantId: string | null;
   quantity: number;
   unitPrice: number;
-  variant: ProductVariant & { product: Product };
+  variant: (ProductVariant & { product: Product }) | null;
+  product: Product | null;
+  customName: string | null;
+  customSize: string | null;
 }
 
 export type OrderStatus = "pending" | "confirmed" | "delivered" | "cancelled";
@@ -138,6 +147,10 @@ export interface Order {
   plantId: string;
   plant: PlantRef;
   items: OrderItem[];
+  voiceNote: { durationMs: number | null } | null;
+  channel: "in_person" | "phone";
+  storeId: string | null;
+  distanceFromStoreM: number | null;
 }
 
 export interface Visit {

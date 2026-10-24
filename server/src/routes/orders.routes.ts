@@ -1,14 +1,54 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
+import multer from "multer";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { requireAdmin, requireAuth, requireRole } from "../middleware/auth";
 import { plantPriceMap } from "../lib/prices";
 import { plantFilter } from "../lib/scope";
+import { distanceM } from "../lib/geo";
 
 export const ordersRouter = Router();
 
 ordersRouter.use(requireAuth);
+
+// A voice note comes with the order as multipart (an "order" JSON field plus a
+// "voiceNote" file). A few minutes of phone audio stays well under 8 MB.
+const VOICE_NOTE_MAX_BYTES = 8 * 1024 * 1024;
+const voiceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: VOICE_NOTE_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => cb(null, file.mimetype.startsWith("audio/")),
+});
+
+const orderInclude = {
+  employee: { select: { id: true, name: true } },
+  district: true,
+  plant: { select: { id: true, name: true, code: true } },
+  items: { include: { variant: { include: { product: true } }, product: true } },
+  voiceNote: { select: { durationMs: true } },
+  store: { select: { id: true, name: true, lat: true, lng: true } },
+} as const;
+
+const catalogItem = z.object({
+  variantId: z.string().min(1),
+  quantity: z.number().int().positive(),
+});
+
+// A size or pack the catalogue doesn't have, priced by the salesperson on the
+// spot: of a catalogue product (productId) or one they name (customName).
+const customItem = z
+  .object({
+    productId: z.string().min(1).optional(),
+    customName: z.string().trim().max(200).optional(),
+    customSize: z.string({ required_error: "Describe the custom size or pack" }).trim().min(1, "Describe the custom size or pack").max(100),
+    quantity: z.number().int().positive(),
+    unitPrice: z
+      .number({ required_error: "Enter the price for the custom item" })
+      .positive("Enter the price for the custom item")
+      .max(10_000_000),
+  })
+  .refine((i) => i.productId || i.customName, "Name the product for the custom item");
 
 const createSchema = z.object({
   customerName: z.string().min(1),
@@ -17,22 +57,43 @@ const createSchema = z.object({
   notes: z.string().optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
+  channel: z.enum(["in_person", "phone"]).default("in_person"),
+  storeId: z.string().min(1).optional(),
+  voiceNoteDurationMs: z.number().int().nonnegative().optional(),
+  // A line with a variantId is a catalogue size, any other a custom line.
   items: z
-    .array(
-      z.object({
-        variantId: z.string().min(1),
-        quantity: z.number().int().positive(),
+    .array(z.record(z.unknown()))
+    .min(1)
+    .transform((lines, ctx) =>
+      lines.map((line) => {
+        const r = "variantId" in line ? catalogItem.safeParse(line) : customItem.safeParse(line);
+        if (!r.success) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.error.issues[0]?.message ?? "Invalid order line" });
+          return z.NEVER;
+        }
+        return r.data;
       })
-    )
-    .min(1),
+    ),
 });
 
-ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
-  const parsed = createSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+// JSON body, or multipart with the order JSON in an "order" field.
+function orderBody(req: Request): unknown {
+  if (typeof req.body?.order !== "string") return req.body;
+  try {
+    return JSON.parse(req.body.order);
+  } catch {
+    return null;
   }
-  const { customerName, customerPhone, shopName, notes, lat, lng, items } = parsed.data;
+}
+
+ordersRouter.post("/", requireRole("sales_employee"), voiceUpload.single("voiceNote"), async (req, res) => {
+  const parsed = createSchema.safeParse(orderBody(req));
+  if (!parsed.success) {
+    const custom = parsed.error.issues.find((i) => i.code === "custom");
+    return res.status(400).json({ error: custom?.message ?? parsed.error.flatten() });
+  }
+  const { customerName, customerPhone, shopName, notes, lat, lng, items, voiceNoteDurationMs, channel, storeId } =
+    parsed.data;
   const employeeId = req.user!.sub;
 
   const employee = await prisma.user.findUnique({
@@ -51,7 +112,33 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
     return res.status(409).json({ error: "Start duty before taking an order." });
   }
 
-  const variantIds = items.map((i) => i.variantId);
+  // A shop of the salesperson's plant: approved, or one they added themselves.
+  const store = storeId
+    ? await prisma.store.findFirst({
+        where: { id: storeId, plantId: employee.plantId, OR: [{ status: "approved" }, { createdById: employeeId }] },
+        select: { id: true, name: true, lat: true, lng: true },
+      })
+    : null;
+  if (storeId && !store) return res.status(400).json({ error: "That shop is not on your plant's map" });
+  // Taken in person means the phone was at the shop. The distance is kept so
+  // the office can see an "in person" order that was really taken elsewhere.
+  const distanceFromStoreM =
+    store && channel === "in_person" && lat !== undefined && lng !== undefined
+      ? Math.round(distanceM(store, { lat, lng }))
+      : null;
+
+  const catalogLines = items.filter((i): i is z.infer<typeof catalogItem> => "variantId" in i);
+  const customLines = items.filter((i): i is z.infer<typeof customItem> => !("variantId" in i));
+
+  const customProductIds = [...new Set(customLines.flatMap((i) => (i.productId ? [i.productId] : [])))];
+  if (customProductIds.length > 0) {
+    const found = await prisma.product.count({ where: { id: { in: customProductIds }, active: true } });
+    if (found !== customProductIds.length) {
+      return res.status(400).json({ error: "A custom item's product is not found or no longer available" });
+    }
+  }
+
+  const variantIds = catalogLines.map((i) => i.variantId);
   const variants = await prisma.productVariant.findMany({
     where: { id: { in: variantIds }, active: true, product: { active: true } },
   });
@@ -75,14 +162,26 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
     });
   }
 
-  const orderItems = items.map((i) => ({
-    variantId: i.variantId,
-    quantity: i.quantity,
-    unitPrice: priceById.get(i.variantId)!,
-  }));
+  const orderItems: Prisma.OrderItemCreateWithoutOrderInput[] = [
+    ...catalogLines.map((i) => ({
+      variant: { connect: { id: i.variantId } },
+      quantity: i.quantity,
+      unitPrice: priceById.get(i.variantId)!,
+    })),
+    ...customLines.map((i) => ({
+      ...(i.productId ? { product: { connect: { id: i.productId } } } : { customName: i.customName }),
+      customSize: i.customSize,
+      quantity: i.quantity,
+      unitPrice: new Prisma.Decimal(i.unitPrice.toFixed(2)),
+    })),
+  ];
   // Decimal arithmetic, so paise never drift the way floating point does.
-  const totalAmount = orderItems.reduce((sum, i) => sum.add(i.unitPrice.mul(i.quantity)), new Prisma.Decimal(0));
+  const totalAmount = orderItems.reduce(
+    (sum, i) => sum.add(new Prisma.Decimal(i.unitPrice as Prisma.Decimal).mul(i.quantity)),
+    new Prisma.Decimal(0)
+  );
 
+  const voice = req.file;
   const order = await prisma.order.create({
     data: {
       employeeId,
@@ -90,18 +189,50 @@ ordersRouter.post("/", requireRole("sales_employee"), async (req, res) => {
       plantId: employee.plantId,
       customerName,
       customerPhone,
-      shopName,
+      shopName: shopName ?? store?.name,
       notes,
       lat,
       lng,
+      channel,
+      storeId: store?.id,
+      distanceFromStoreM,
       totalAmount,
       items: { create: orderItems },
+      ...(voice
+        ? { voiceNote: { create: { mimeType: voice.mimetype, durationMs: voiceNoteDurationMs, data: voice.buffer } } }
+        : {}),
     },
-    include: { items: { include: { variant: { include: { product: true } } } } },
+    include: orderInclude,
   });
 
   res.status(201).json({ order });
 });
+
+// The order's voice note as audio, for the office (or the salesperson who
+// recorded it) to play back.
+ordersRouter.get("/:id/voice-note", async (req, res) => {
+  const order = await findVisibleOrder(req, req.params.id);
+  if (!order) return res.status(404).json({ error: "Order not found" });
+  const note = await prisma.orderVoiceNote.findUnique({ where: { orderId: order.id } });
+  if (!note) return res.status(404).json({ error: "This order has no voice note" });
+  res.setHeader("Content-Type", note.mimeType);
+  res.setHeader("Cache-Control", "private, max-age=3600");
+  res.send(Buffer.from(note.data));
+});
+
+// The order if this user may see it: their own as a salesperson, their
+// plant's as a plant admin. Anything else is "not found", so an id says nothing.
+async function findVisibleOrder(req: Request, id: string) {
+  const role = req.user!.role;
+  return prisma.order.findFirst({
+    where: {
+      id,
+      ...(role === "sales_employee" ? { employeeId: req.user!.sub } : {}),
+      ...(role === "admin" ? { plantId: req.user!.plantId ?? "" } : {}),
+    },
+    select: { id: true },
+  });
+}
 
 const listQuerySchema = z.object({
   employeeId: z.string().optional(),
@@ -136,12 +267,7 @@ ordersRouter.get("/", async (req, res) => {
 
   const orders = await prisma.order.findMany({
     where,
-    include: {
-      employee: { select: { id: true, name: true } },
-      district: true,
-      plant: { select: { id: true, name: true, code: true } },
-      items: { include: { variant: { include: { product: true } } } },
-    },
+    include: orderInclude,
     orderBy: { createdAt: "desc" },
   });
 
@@ -151,12 +277,7 @@ ordersRouter.get("/", async (req, res) => {
 ordersRouter.get("/:id", async (req, res) => {
   const order = await prisma.order.findUnique({
     where: { id: req.params.id },
-    include: {
-      employee: { select: { id: true, name: true } },
-      district: true,
-      plant: { select: { id: true, name: true, code: true } },
-      items: { include: { variant: { include: { product: true } } } },
-    },
+    include: orderInclude,
   });
   if (!order) return res.status(404).json({ error: "Order not found" });
   if (req.user!.role === "sales_employee" && order.employeeId !== req.user!.sub) {

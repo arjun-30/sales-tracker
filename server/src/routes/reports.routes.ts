@@ -92,6 +92,8 @@ reportsRouter.get("/summary", async (req, res) => {
         quantity: true,
         unitPrice: true,
         variant: { select: { product: { select: { id: true, name: true, category: true } } } },
+        product: { select: { id: true, name: true, category: true } },
+        customName: true,
       },
     }),
     prisma.order.groupBy({ by: ["employeeId"], where: salesWhere, _sum: { totalAmount: true }, _count: true }),
@@ -143,7 +145,10 @@ reportsRouter.get("/summary", async (req, res) => {
   const productAgg = new Map<string, { name: string; category: string; quantity: number; revenue: number }>();
   const categoryAgg = new Map<string, number>();
   for (const item of orderItemsForAgg) {
-    const product = item.variant.product;
+    // A custom line counts towards its catalogue product; one for a product
+    // the catalogue doesn't have is grouped under its own name.
+    const product = item.variant?.product ??
+      item.product ?? { id: `custom:${item.customName ?? ""}`, name: item.customName ?? "Custom item", category: "Custom" };
     const revenue = item.unitPrice.mul(item.quantity).toNumber();
     const existing = productAgg.get(product.id) ?? {
       name: product.name,

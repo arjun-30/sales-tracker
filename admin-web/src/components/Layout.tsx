@@ -41,7 +41,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: "Team",
     items: [
       { to: "/employees", label: "Employees", icon: Users },
-      { to: "/attendance", label: "Attendance", icon: Clock },
+      { to: "/attendance", label: "Employee history", icon: Clock },
       { to: "/plants", label: "Plants & Admins", icon: Factory, superOnly: true },
     ],
   },

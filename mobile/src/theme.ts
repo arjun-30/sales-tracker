@@ -67,3 +67,23 @@ export function displayProductName(name: string) {
     .trim()
     .replace(/(^|[\s(])([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
 }
+
+// An order line's product and size, for a catalogue size or a custom one.
+export function itemName(i: {
+  variant: { product: { name: string } } | null;
+  product: { name: string } | null;
+  customName: string | null;
+}) {
+  return displayProductName(i.variant?.product.name ?? i.product?.name ?? i.customName ?? "Custom item");
+}
+
+export function itemSize(i: { variant: { sizeLabel: string } | null; customSize: string | null }) {
+  if (i.variant) return i.variant.sizeLabel === "STD" ? "Standard pack" : i.variant.sizeLabel;
+  return `${i.customSize ?? ""} (custom)`;
+}
+
+// 75000 → "1:15"
+export function formatClock(ms: number) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}

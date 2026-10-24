@@ -8,6 +8,8 @@ import { Card, CardHeader, Notice, PageHeader, Segmented, StatCard, Status } fro
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { MessageRow, Table, Td, Th, Tr } from "../components/ui/Table";
+import { EmployeeDayRoute } from "../components/EmployeeDayRoute";
+import { EmployeeActivity } from "../components/EmployeeActivity";
 
 type RangeId = "today" | "7d" | "30d" | "month";
 
@@ -79,8 +81,8 @@ export function Attendance() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Attendance"
-        description="Look up a salesperson by employee code to see the hours they were on duty."
+        title="Employee history"
+        description="Look up a salesperson by employee code: hours on duty, the route they took each day, and every order, visit and shop they added."
       />
 
       <Card className="p-5">
@@ -248,6 +250,13 @@ export function Attendance() {
               </Table>
             </Card>
           </div>
+
+          <EmployeeDayRoute
+            code={emp.employeeCode ?? code}
+            initialDate={report.days.length ? report.days[report.days.length - 1].date : undefined}
+          />
+
+          <EmployeeActivity employeeId={emp.id} from={report.from} to={report.to} />
         </div>
       )}
     </div>

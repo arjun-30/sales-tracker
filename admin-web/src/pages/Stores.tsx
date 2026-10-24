@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useState, type FormEvent } from "react";
 import { GoogleMap, MarkerF, useJsApiLoader } from "@react-google-maps/api";
-import { Building2, CalendarPlus, MapPin, Phone, Plus, Search } from "lucide-react";
+import { Building2, CalendarPlus, FileSpreadsheet, MapPin, Phone, Plus, Search } from "lucide-react";
 import { api } from "../lib/api";
 import { formatDate } from "../lib/format";
 import type { Store } from "../lib/types";
@@ -9,6 +9,7 @@ import { Card, CardHeader, Notice, PageHeader, StatCard } from "../components/ui
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select } from "../components/ui/Input";
 import { MessageRow, Table, Td, Th, Tr } from "../components/ui/Table";
+import { StoreImport } from "../components/StoreImport";
 
 const TAMIL_NADU_CENTER = { lat: 10.8284, lng: 78.7638 };
 
@@ -220,6 +221,7 @@ export function Stores() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Store | "new" | null>(null);
+  const [importing, setImporting] = useState(false);
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const showPlant = isSuperAdmin && !plantId;
@@ -233,20 +235,36 @@ export function Stores() {
 
   useEffect(refresh, []);
 
+  // Shops salespeople added from the field wait here for approval.
+  const pending = useMemo(() => stores.filter((s) => s.status === "pending"), [stores]);
+  const approved = useMemo(() => stores.filter((s) => s.status === "approved"), [stores]);
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return stores;
-    return stores.filter((s) =>
+    if (!q) return approved;
+    return approved.filter((s) =>
       [s.name, s.ownerName, s.phone, s.address, s.plant.name].some((v) => v?.toLowerCase().includes(q))
     );
-  }, [stores, query]);
+  }, [approved, query]);
 
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const addedThisWeek = stores.filter((s) => new Date(s.createdAt).getTime() > weekAgo).length;
-  const withPhone = stores.filter((s) => s.phone).length;
+  const addedThisWeek = approved.filter((s) => new Date(s.createdAt).getTime() > weekAgo).length;
+  const withPhone = approved.filter((s) => s.phone).length;
+
+  async function approve(store: Store) {
+    try {
+      await api(`/api/stores/${store.id}/approve`, { method: "POST" });
+      setStores((prev) => prev.map((s) => (s.id === store.id ? { ...s, status: "approved" } : s)));
+      setNotice({ tone: "ok", text: `${store.name} approved. The whole team sees it on the map now.` });
+    } catch (err) {
+      setNotice({ tone: "error", text: err instanceof Error ? err.message : "Could not approve the store" });
+    }
+  }
 
   async function remove(store: Store) {
-    if (!window.confirm(`Remove ${store.name} from the map?`)) return;
+    const question =
+      store.status === "pending" ? `Reject ${store.name}? It is removed from the salesperson's map.` : `Remove ${store.name} from the map?`;
+    if (!window.confirm(question)) return;
     try {
       await api(`/api/stores/${store.id}`, { method: "DELETE" });
       setStores((prev) => prev.filter((s) => s.id !== store.id));
@@ -260,21 +278,100 @@ export function Stores() {
     <div className="space-y-6">
       <PageHeader
         title="Stores"
-        description="Shops and dealers on the Live Map. Paste a Google Maps link to place one."
+        description="Shops and dealers on the Live Map. Paste a Google Maps link to place one, import a list from Excel, or approve the ones salespeople add from the field."
         actions={
-          editing === null ? (
-            <Button onClick={() => setEditing("new")} disabled={isSuperAdmin && plants.length === 0}>
-              <Plus className="h-4 w-4" /> Add store
-            </Button>
+          editing === null && !importing ? (
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setImporting(true)} disabled={isSuperAdmin && plants.length === 0}>
+                <FileSpreadsheet className="h-4 w-4" /> Import from Excel
+              </Button>
+              <Button onClick={() => setEditing("new")} disabled={isSuperAdmin && plants.length === 0}>
+                <Plus className="h-4 w-4" /> Add store
+              </Button>
+            </div>
           ) : null
         }
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <StatCard label="Stores" value={stores.length} icon={Building2} hint="Pinned on the map" accent />
-        <StatCard label="With a phone number" value={withPhone} icon={Phone} hint={`${stores.length - withPhone} without`} />
-        <StatCard label="Added this week" value={addedThisWeek} icon={CalendarPlus} hint="Last 7 days" />
+        <StatCard label="Stores" value={approved.length} icon={Building2} hint="Pinned on the map" accent />
+        <StatCard label="With a phone number" value={withPhone} icon={Phone} hint={`${approved.length - withPhone} without`} />
+        <StatCard
+          label="Added this week"
+          value={addedThisWeek}
+          icon={CalendarPlus}
+          hint={pending.length ? `${pending.length} waiting for approval` : "Last 7 days"}
+        />
       </div>
+
+      {importing ? (
+        <StoreImport
+          onCancel={() => setImporting(false)}
+          onDone={(created) => {
+            setNotice({ tone: "ok", text: `${created} ${created === 1 ? "store" : "stores"} added from the file.` });
+            refresh();
+          }}
+        />
+      ) : null}
+
+      {pending.length > 0 ? (
+        <Card>
+          <CardHeader
+            title={`Waiting for approval · ${pending.length}`}
+            description="Added by salespeople standing in the shop, pinned at their phone's position. Check the pin, then approve or reject."
+          />
+          <Table>
+            <thead>
+              <tr>
+                <Th>Shop</Th>
+                <Th>Phone</Th>
+                <Th>Where</Th>
+                <Th>Added by</Th>
+                <Th className="text-right">Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {pending.map((s) => (
+                <Tr key={s.id}>
+                  <Td>
+                    <div className="font-medium text-neutral-900">{s.name}</div>
+                    {s.ownerName ? <div className="text-xs text-neutral-500">{s.ownerName}</div> : null}
+                  </Td>
+                  <Td className="tabular-nums">{s.phone ?? <span className="text-neutral-400">—</span>}</Td>
+                  <Td className="max-w-72">
+                    <div className="truncate">{s.address ?? <span className="text-neutral-400">—</span>}</div>
+                    <a
+                      href={mapsLink(s)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
+                    >
+                      <MapPin className="h-3 w-3" /> Check on Google Maps
+                    </a>
+                  </Td>
+                  <Td>
+                    <div>{s.createdBy?.name ?? "—"}</div>
+                    <div className="text-xs text-neutral-500">{formatDate(s.createdAt)}</div>
+                  </Td>
+                  <Td className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button size="sm" onClick={() => approve(s)}>
+                        Approve
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(s)}>
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => remove(s)}>
+                        Reject
+                      </Button>
+                    </div>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      ) : null}
 
       {editing !== null ? (
         <StoreForm
@@ -303,7 +400,7 @@ export function Stores() {
             />
           </div>
           <div className="ml-auto text-[13px] text-neutral-500">
-            {visible.length} of {stores.length}
+            {visible.length} of {approved.length}
           </div>
         </div>
         <Table>
@@ -321,7 +418,7 @@ export function Stores() {
             {loading ? <MessageRow colSpan={showPlant ? 6 : 5}>Loading stores…</MessageRow> : null}
             {!loading && visible.length === 0 ? (
               <MessageRow colSpan={showPlant ? 6 : 5}>
-                {stores.length ? "No store matches that search." : "No stores yet. Add the first one."}
+                {approved.length ? "No store matches that search." : "No stores yet. Add the first one or import a list."}
               </MessageRow>
             ) : null}
             {!loading &&

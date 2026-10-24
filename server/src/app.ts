@@ -16,13 +16,15 @@ import { reportsRouter } from "./routes/reports.routes";
 import { plantsRouter } from "./routes/plants.routes";
 import { adminsRouter } from "./routes/admins.routes";
 import { storesRouter } from "./routes/stores.routes";
+import { MulterError } from "multer";
 import { HttpError } from "./lib/scope";
 
 export const app = express();
 app.set("trust proxy", config.trustProxy);
 app.disable("x-powered-by");
 app.use(cors({ origin: config.corsOrigin }));
-app.use(express.json());
+// Room for an imported dealer list (a couple of thousand rows).
+app.use(express.json({ limit: "2mb" }));
 // Money columns are Prisma Decimals, which JSON.stringify would turn into
 // strings. Send them as numbers so the clients keep working unchanged.
 app.set("json replacer", function (this: Record<string, unknown>, key: string, value: unknown) {
@@ -63,6 +65,12 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
   if (err instanceof Prisma.PrismaClientValidationError) {
     return res.status(400).json({ error: "Invalid request parameters" });
+  }
+  // An order's voice note that is too long, or more than one file.
+  if (err instanceof MulterError) {
+    return res
+      .status(err.code === "LIMIT_FILE_SIZE" ? 413 : 400)
+      .json({ error: err.code === "LIMIT_FILE_SIZE" ? "The voice note is too long. Keep it under a few minutes." : err.message });
   }
   if (err instanceof SyntaxError && "body" in err) {
     return res.status(400).json({ error: "Malformed JSON body" });

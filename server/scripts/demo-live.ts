@@ -15,6 +15,7 @@ const TICK_MS = 30_000;
 
 interface Walker {
   name: string;
+  code: string;
   token: string;
   lat: number;
   lng: number;
@@ -45,8 +46,8 @@ async function main() {
     const { accessToken } = await call("/api/auth/login", "POST", null, { phone: u.phone, password: PASSWORD });
     const home = { lat: u.district!.centerLat, lng: u.district!.centerLng };
     const start = u.employeeLocation ?? home;
-    await call("/api/tracking/duty", "POST", accessToken, { onDuty: true, lat: start.lat, lng: start.lng });
-    walkers.push({ name: u.name, token: accessToken, lat: start.lat, lng: start.lng, heading: Math.random() * 360, home });
+    await call("/api/tracking/duty", "POST", accessToken, { onDuty: true, employeeCode: u.employeeCode, lat: start.lat, lng: start.lng });
+    walkers.push({ name: u.name, code: u.employeeCode ?? "", token: accessToken, lat: start.lat, lng: start.lng, heading: Math.random() * 360, home });
     console.log(`${u.name} on duty in ${u.district!.name}`);
   }
 
@@ -73,7 +74,7 @@ async function main() {
   const stop = async () => {
     clearInterval(timer);
     for (const w of walkers) {
-      await call("/api/tracking/duty", "POST", w.token, { onDuty: false }).catch(() => {});
+      await call("/api/tracking/duty", "POST", w.token, { onDuty: false, employeeCode: w.code }).catch(() => {});
     }
     console.log("Demo salespeople are off duty.");
     process.exit(0);

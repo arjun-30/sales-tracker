@@ -7,7 +7,8 @@ import { api } from "../lib/api";
 import type { Order, OrderStatus as Status } from "../lib/types";
 import type { RootStackParamList } from "../navigation/types";
 import { EmptyState, Loading, OrderStatus, SectionLabel } from "../components/ui";
-import { colors, displayProductName, formatINR, formatTime, radius, statusTone } from "../theme";
+import { OrderVoiceNote } from "../components/VoiceNote";
+import { colors, formatINR, formatTime, itemName, itemSize, radius, statusTone } from "../theme";
 
 type Tab = "all" | Status;
 
@@ -181,7 +182,7 @@ function OrderRow({
 
       {lead && !expanded ? (
         <Text style={styles.items} numberOfLines={1}>
-          {displayProductName(lead.variant.product.name)} {lead.variant.sizeLabel} × {lead.quantity}
+          {itemName(lead)} {itemSize(lead)} × {lead.quantity}
           {order.items.length > 1 ? `  ·  +${order.items.length - 1} more` : ""}
         </Text>
       ) : null}
@@ -192,16 +193,17 @@ function OrderRow({
             <View key={i.id} style={styles.line}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.lineName} numberOfLines={2}>
-                  {displayProductName(i.variant.product.name)}
+                  {itemName(i)}
                 </Text>
                 <Text style={styles.lineMeta}>
-                  {i.variant.sizeLabel} · {i.quantity} × {formatINR(i.unitPrice)}
+                  {itemSize(i)} · {i.quantity} × {formatINR(i.unitPrice)}
                 </Text>
               </View>
               <Text style={styles.lineTotal}>{formatINR(i.unitPrice * i.quantity)}</Text>
             </View>
           ))}
           {order.notes ? <Text style={styles.notes}>Note: {order.notes}</Text> : null}
+          {order.voiceNote ? <OrderVoiceNote orderId={order.id} durationMs={order.voiceNote.durationMs} /> : null}
         </View>
       ) : null}
 
@@ -209,7 +211,11 @@ function OrderRow({
         <OrderStatus status={order.status} />
         <Text style={styles.meta}>
           {units} {units === 1 ? "unit" : "units"}  ·  {formatTime(order.createdAt)}
+          {order.channel === "phone" ? "  ·  by phone" : ""}
         </Text>
+        {order.voiceNote && !expanded ? (
+          <Ionicons name="mic-outline" size={15} color={colors.textMuted} accessibilityLabel="Has a voice note" />
+        ) : null}
         <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={16} color={colors.textFaint} />
       </View>
     </TouchableOpacity>

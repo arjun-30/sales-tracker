@@ -170,3 +170,71 @@ describe("order status", () => {
     expect((await setStatus(id, "shipped")).status).toBe(400);
   });
 });
+
+describe("custom items", () => {
+  it("a custom size of a catalogue product is priced by the salesperson and counted in the total", async () => {
+    const res = await placeOrder([
+      { variantId: f.v1L.id, quantity: 2 },
+      { productId: f.product.id, customSize: "15 L", quantity: 3, unitPrice: 2450.5 },
+      { customName: "Wall putty (loose)", customSize: "25 kg bag", quantity: 1, unitPrice: 600 },
+    ]);
+    expect(res.status).toBe(201);
+    expect(res.body.order.totalAmount).toBe(2 * 500 + 3 * 2450.5 + 600);
+    const custom = res.body.order.items.filter((i: { variantId: string | null }) => !i.variantId);
+    expect(custom).toHaveLength(2);
+    expect(custom.find((i: { customSize: string }) => i.customSize === "15 L").product.id).toBe(f.product.id);
+    expect(custom.find((i: { customSize: string }) => i.customSize === "25 kg bag").customName).toBe("Wall putty (loose)");
+  });
+
+  it.each([
+    [{ productId: "x", customSize: "15 L", quantity: 1 }, /price/i],
+    [{ customSize: "15 L", quantity: 1, unitPrice: 100 }, /name the product/i],
+    [{ customName: "Putty", customSize: "", quantity: 1, unitPrice: 100 }, /custom size/i],
+  ])("refuses an incomplete custom line %#", async (line, message) => {
+    const res = await placeOrder([line]);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(message);
+  });
+
+  it("refuses a custom line for an unknown product", async () => {
+    const res = await placeOrder([{ productId: "nope", customSize: "15 L", quantity: 1, unitPrice: 100 }]);
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("voice notes", () => {
+  const audio = Buffer.from("fake-m4a-bytes");
+  const placeWithVoice = () =>
+    api()
+      .post("/api/orders")
+      .set(bearer(emp))
+      .field(
+        "order",
+        JSON.stringify({ customerName: "Lakshmi Hardware", voiceNoteDurationMs: 4200, items: [{ variantId: f.v1L.id, quantity: 1 }] })
+      )
+      .attach("voiceNote", audio, { filename: "note.m4a", contentType: "audio/mp4" });
+
+  it("is saved with the order and played back to the office and the salesperson", async () => {
+    const res = await placeWithVoice();
+    expect(res.status).toBe(201);
+    expect(res.body.order.voiceNote).toEqual({ durationMs: 4200 });
+
+    for (const token of [admin, emp]) {
+      const play = await api().get(`/api/orders/${res.body.order.id}/voice-note`).set(bearer(token)).buffer(true);
+      expect(play.status).toBe(200);
+      expect(play.headers["content-type"]).toBe("audio/mp4");
+      expect(Buffer.from(play.body).equals(audio)).toBe(true);
+    }
+  });
+
+  it("is hidden from another salesperson", async () => {
+    const res = await placeWithVoice();
+    const other = (await login("9000000002")).accessToken;
+    expect((await api().get(`/api/orders/${res.body.order.id}/voice-note`).set(bearer(other))).status).toBe(404);
+  });
+
+  it("an order without one says so", async () => {
+    const id = await newOrderId();
+    expect((await api().get(`/api/orders/${id}/voice-note`).set(bearer(admin))).status).toBe(404);
+  });
+});

@@ -94,7 +94,7 @@ describe("duty sessions and attendance", () => {
   afterAll(() => prisma.$disconnect());
 
   const duty = (onDuty: boolean) =>
-    api().post("/api/tracking/duty").set(bearer(empA)).send({ onDuty, lat: 13.05, lng: 80.25 });
+    api().post("/api/tracking/duty").set(bearer(empA)).send({ onDuty, employeeCode: "RLX-CHN-001", lat: 13.05, lng: 80.25 });
 
   it("going on duty opens one session, even when tapped twice; going off closes it", async () => {
     await duty(true);
@@ -247,7 +247,7 @@ describe("an employee's own duty status", () => {
   });
 
   it("reports on-duty since the open session started, and today's minutes", async () => {
-    await api().post("/api/tracking/duty").set(bearer(empA)).send({ onDuty: true, lat: 13, lng: 80 });
+    await api().post("/api/tracking/duty").set(bearer(empA)).send({ onDuty: true, employeeCode: "RLX-CHN-001", lat: 13, lng: 80 });
     const started = new Date(Date.now() - 40 * 60 * 1000);
     await prisma.dutySession.updateMany({ where: { userId: f.empA.id }, data: { startedAt: started } });
 

@@ -79,3 +79,15 @@ export async function api<T>(path: string, options: RequestInit = {}, retry = tr
   if (res.status === 204) return undefined as T;
   return res.json();
 }
+
+// A file the API serves behind login (an order's voice note), as a Blob.
+export async function apiBlob(path: string, retry = true): Promise<Blob> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (res.status === 401 && retry && (await tryRefresh())) return apiBlob(path, false);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(typeof body.error === "string" ? body.error : res.statusText);
+  }
+  return res.blob();
+}

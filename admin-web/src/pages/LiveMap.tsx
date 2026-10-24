@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DataF, GoogleMap, InfoWindowF, MarkerF, PolygonF, useJsApiLoader } from "@react-google-maps/api";
+import { DataF, GoogleMap, InfoWindowF, MarkerF, OverlayViewF, PolygonF, useJsApiLoader } from "@react-google-maps/api";
 import { Link } from "react-router-dom";
 import { Building2, Crosshair, MapPin, WifiOff } from "lucide-react";
 import { api } from "../lib/api";
@@ -76,10 +76,22 @@ const OFFLINE_AFTER_MS = 2 * 60 * 60 * 1000;
 
 const COLOR_ACTIVE = "#0047ab";
 const COLOR_STALE = "#a3a3a3";
-const COLOR_STORE = "#2f271f";
+const COLOR_STILL = "#dc2626";
+const COLOR_STORE = "#d97706";
 
-// A small house outline, so stores read differently from the round staff markers.
-const STORE_PATH = "M -7 -1 L 0 -8 L 7 -1 L 7 7 L -7 7 Z";
+// An employee in the same spot this long blinks red on the map.
+const STILL_AFTER_MS = 60 * 60 * 1000;
+
+// Stores are amber map pins with a shop front, so they can't be mistaken for
+// the round staff markers.
+const STORE_PIN_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' width='30' height='38' viewBox='0 0 30 38'>" +
+  `<path d='M15 36.5S27 24.6 27 15A12 12 0 0 0 3 15c0 9.6 12 21.5 12 21.5z' fill='${COLOR_STORE}' stroke='#fff' stroke-width='2'/>` +
+  "<path d='M8.5 9.5h13l1.3 3.4a2 2 0 0 1-3.7 1.1 2 2 0 0 1-3.6 0 2 2 0 0 1-3.6 0 2 2 0 0 1-3.7-1.1z' fill='#fff'/>" +
+  "<path d='M9.6 15.6v5.6h10.8v-5.6' fill='none' stroke='#fff' stroke-width='1.6'/>" +
+  "<rect x='13.4' y='17.4' width='3.2' height='3.8' fill='#fff'/>" +
+  "</svg>";
+const STORE_PIN_URL = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(STORE_PIN_SVG)}`;
 
 type Status = "active" | "stale" | "offline";
 
@@ -88,14 +100,28 @@ function statusOf(updatedAt: string, now: number): Status {
   return age > OFFLINE_AFTER_MS ? "offline" : age > STALE_AFTER_MS ? "stale" : "active";
 }
 
+// How long they've been in one spot, once that passes the hour.
+function stillFor(stationarySince: string | null | undefined, now: number): number | null {
+  if (!stationarySince) return null;
+  const ms = now - new Date(stationarySince).getTime();
+  return ms >= STILL_AFTER_MS ? ms : null;
+}
+
+function formatStay(ms: number): string {
+  const mins = Math.floor(ms / 60_000);
+  return mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h ${mins % 60} min`;
+}
+
 interface LiveEntry {
   employeeId: string;
   name: string;
+  employeeCode?: string | null;
   plantId?: string | null;
   districtId: string | null;
   lat: number;
   lng: number;
   onDuty: boolean;
+  stationarySince?: string | null;
   updatedAt: string;
 }
 
@@ -163,7 +189,8 @@ export function LiveMap() {
 
   useEffect(() => {
     api<{ districts: District[] }>("/api/districts").then((d) => setDistricts(d.districts));
-    api<{ stores: Store[] }>("/api/stores").then((d) => setStores(d.stores));
+    // Only approved shops; ones waiting for approval are on the Stores page.
+    api<{ stores: Store[] }>("/api/stores").then((d) => setStores(d.stores.filter((s) => s.status === "approved")));
 
     api<{ locations: EmployeeLocation[] }>("/api/tracking/live").then((d) => {
       const next: Record<string, LiveEntry> = {};
@@ -172,11 +199,13 @@ export function LiveMap() {
         next[loc.userId] = {
           employeeId: loc.userId,
           name: loc.user.name,
+          employeeCode: loc.user.employeeCode,
           plantId: loc.user.plantId,
           districtId: loc.user.districtId,
           lat: loc.lat,
           lng: loc.lng,
           onDuty: loc.onDuty,
+          stationarySince: loc.stationarySince,
           updatedAt: loc.updatedAt,
         };
       }
@@ -220,7 +249,7 @@ export function LiveMap() {
     () =>
       Object.values(entries)
         .filter((e) => !districtFilter || e.districtId === districtFilter)
-        .map((e) => ({ ...e, status: statusOf(e.updatedAt, now) }))
+        .map((e) => ({ ...e, status: statusOf(e.updatedAt, now), still: stillFor(e.stationarySince, now) }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [entries, districtFilter, now]
   );
@@ -229,6 +258,7 @@ export function LiveMap() {
   const offline = useMemo(() => visibleEntries.filter((e) => e.status === "offline"), [visibleEntries]);
   const activeCount = onMap.filter((e) => e.status === "active").length;
   const staleCount = onMap.length - activeCount;
+  const stillCount = onMap.filter((e) => e.still !== null).length;
 
   const districtNameById = useMemo(() => new Map(districts.map((d) => [d.id, d.name])), [districts]);
 
@@ -441,12 +471,9 @@ export function LiveMap() {
                     setSelectedStore((cur) => (cur === st.id ? null : st.id));
                   }}
                   icon={{
-                    path: STORE_PATH,
-                    scale: 1,
-                    fillColor: COLOR_STORE,
-                    fillOpacity: 0.9,
-                    strokeColor: "#ffffff",
-                    strokeWeight: 1.5,
+                    url: STORE_PIN_URL,
+                    scaledSize: new google.maps.Size(26, 33),
+                    anchor: new google.maps.Point(13, 32),
                   }}
                 >
                   {selectedStore === st.id && (
@@ -473,21 +500,38 @@ export function LiveMap() {
                   )}
                 </MarkerF>
               ))}
+            {/* A pulsing red ring under anyone who has stayed in one spot an hour or more. */}
+            {onMap
+              .filter((e) => e.still !== null)
+              .map((e) => (
+                <OverlayViewF
+                  key={`still-${e.employeeId}`}
+                  position={{ lat: e.lat, lng: e.lng }}
+                  mapPaneName="overlayLayer"
+                  getPixelPositionOffset={(w, h) => ({ x: -w / 2, y: -h / 2 })}
+                >
+                  <span className="pointer-events-none relative flex h-12 w-12 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-60" />
+                    <span className="absolute inline-flex h-9 w-9 animate-pulse rounded-full bg-red-500/30" />
+                  </span>
+                </OverlayViewF>
+              ))}
             {onMap.map((e) => {
               const isStale = e.status === "stale";
+              const isStill = e.still !== null;
               const isSelected = selectedEmployee === e.employeeId;
               return (
                 <MarkerF
                   key={e.employeeId}
                   position={{ lat: e.lat, lng: e.lng }}
                   onClick={() => onSelectEmployee(e.employeeId)}
-                  title={e.name}
-                  zIndex={isSelected ? 1000 : isStale ? 10 : 100}
+                  title={isStill ? `${e.name}: same place for ${formatStay(e.still!)}` : e.name}
+                  zIndex={isSelected ? 1000 : isStill ? 500 : isStale ? 10 : 100}
                   label={{ text: initials(e.name), color: "#ffffff", fontSize: "10px", fontWeight: "600" }}
                   icon={{
                     path: google.maps.SymbolPath.CIRCLE,
                     scale: isSelected ? 15 : 13,
-                    fillColor: isStale ? COLOR_STALE : COLOR_ACTIVE,
+                    fillColor: isStill ? COLOR_STILL : isStale ? COLOR_STALE : COLOR_ACTIVE,
                     fillOpacity: 1,
                     strokeColor: isSelected ? "#00265d" : "#ffffff",
                     strokeWeight: isSelected ? 3 : 2.5,
@@ -495,7 +539,7 @@ export function LiveMap() {
                 >
                   {isSelected && (
                     <InfoWindowF position={{ lat: e.lat, lng: e.lng }} onCloseClick={() => setSelectedEmployee(null)}>
-                      <div className="min-w-40 space-y-1 p-1 text-sm">
+                      <div className="min-w-44 space-y-1 p-1 text-sm">
                         <div className="font-semibold text-neutral-900">{e.name}</div>
                         {e.districtId && (
                           <div className="text-xs text-neutral-500">
@@ -503,9 +547,22 @@ export function LiveMap() {
                             {plantTag(e.plantId) ? ` · ${plantTag(e.plantId)}` : ""}
                           </div>
                         )}
+                        {isStill ? (
+                          <div className="text-xs font-semibold text-red-700">
+                            Same place for {formatStay(e.still!)}
+                          </div>
+                        ) : null}
                         <div className={isStale ? "text-xs font-medium text-amber-600" : "text-xs text-neutral-500"}>
                           {isStale ? "No signal since" : "Updated"} {timeAgo(e.updatedAt, now)}
                         </div>
+                        {e.employeeCode ? (
+                          <Link
+                            to={`/attendance?code=${e.employeeCode}`}
+                            className="inline-block pt-1 text-xs font-medium text-brand-600 hover:underline"
+                          >
+                            View full history
+                          </Link>
+                        ) : null}
                       </div>
                     </InfoWindowF>
                   )}
@@ -556,11 +613,16 @@ export function LiveMap() {
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_STALE }} />
                 No signal 10+ min
               </span>
+              <span className="flex items-center gap-1.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-70" style={{ backgroundColor: COLOR_STILL }} />
+                  <span className="relative h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_STILL }} />
+                </span>
+                Same place 1 h+
+              </span>
               {showStores && stores.length > 0 ? (
                 <span className="flex items-center gap-1.5">
-                  <svg viewBox="-8 -9 16 17" className="h-3 w-3">
-                    <path d={STORE_PATH} fill={COLOR_STORE} />
-                  </svg>
+                  <img src={STORE_PIN_URL} alt="" className="h-4 w-auto" />
                   Store
                 </span>
               ) : null}
@@ -583,8 +645,9 @@ export function LiveMap() {
               </option>
             ))}
           </Select>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-4 gap-2 text-center">
             <Stat label="Active" value={activeCount} tone="text-brand-600" />
+            <Stat label="Same place" value={stillCount} tone="text-red-600" />
             <Stat label="No signal" value={staleCount} tone="text-neutral-500" />
             <Stat label="Offline" value={offline.length} tone="text-neutral-400" />
           </div>
@@ -620,6 +683,7 @@ export function LiveMap() {
             <ul className="divide-y divide-neutral-100">
               {onMap.map((e) => {
                 const isStale = e.status === "stale";
+                const isStill = e.still !== null;
                 const isSelected = selectedEmployee === e.employeeId;
                 return (
                   <li key={e.employeeId}>
@@ -630,8 +694,10 @@ export function LiveMap() {
                       }`}
                     >
                       <span
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
-                        style={{ backgroundColor: isStale ? COLOR_STALE : COLOR_ACTIVE }}
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white ${
+                          isStill ? "animate-pulse" : ""
+                        }`}
+                        style={{ backgroundColor: isStill ? COLOR_STILL : isStale ? COLOR_STALE : COLOR_ACTIVE }}
                       >
                         {initials(e.name)}
                       </span>
@@ -641,6 +707,11 @@ export function LiveMap() {
                           {(e.districtId && districtNameById.get(e.districtId)) || "No district"}
                           {plantTag(e.plantId) ? ` · ${plantTag(e.plantId)}` : ""}
                         </span>
+                        {isStill ? (
+                          <span className="block truncate text-xs font-semibold text-red-700">
+                            Same place for {formatStay(e.still!)}
+                          </span>
+                        ) : null}
                       </span>
                       <span className={`shrink-0 text-[11px] ${isStale ? "text-amber-600" : "text-neutral-400"}`}>
                         {timeAgo(e.updatedAt, now)}

@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, Search } from "lucide-react";
-import { api } from "../lib/api";
+import { ChevronDown, ChevronRight, Mic, Search } from "lucide-react";
+import { api, apiBlob } from "../lib/api";
 import { usePlant } from "../context/PlantContext";
-import { displayProductName, formatDate, formatINR, formatTime } from "../lib/format";
+import { formatDate, formatINR, formatTime, itemName, itemSize } from "../lib/format";
 import type { District, Order, OrderStatus } from "../lib/types";
 import { Card, Notice, OrderStatusLabel, PageHeader, Tabs } from "../components/ui/Card";
 import { Input, Select } from "../components/ui/Input";
@@ -171,17 +171,23 @@ export function Orders() {
                         <div className="truncate text-xs text-neutral-500">
                           {[o.shopName, o.customerPhone].filter(Boolean).join(" · ") || "—"}
                         </div>
+                        <HowTaken order={o} />
                       </Td>
                       <Td className="max-w-[230px]">
                         {first ? (
                           <div className="truncate text-neutral-800">
-                            {displayProductName(first.variant.product.name)} <span className="text-neutral-500">{first.variant.sizeLabel}</span> ×{" "}
-                            {first.quantity}
+                            {itemName(first)} <span className="text-neutral-500">{itemSize(first)}</span> × {first.quantity}
                           </div>
                         ) : null}
-                        <div className="text-xs text-neutral-500">
+                        <div className="flex items-center gap-1.5 text-xs text-neutral-500">
                           {o.items.length > 1 ? `+${o.items.length - 1} more · ` : ""}
                           {units} {units === 1 ? "pack" : "packs"}
+                          {o.items.some((i) => !i.variantId) ? <span className="text-amber-700">· custom</span> : null}
+                          {o.voiceNote ? (
+                            <span className="inline-flex items-center gap-0.5 text-neutral-700" title="Has a voice note">
+                              · <Mic className="h-3.5 w-3.5" /> voice
+                            </span>
+                          ) : null}
                         </div>
                       </Td>
                       <Td className="whitespace-nowrap">
@@ -254,10 +260,19 @@ function OrderDetail({ order }: { order: Order }) {
             {order.items.map((i) => (
               <tr key={i.id} className="border-t border-neutral-100">
                 <td className="px-4 py-2 text-neutral-800">
-                  {displayProductName(i.variant.product.name)}
-                  <span className="ml-2 font-mono text-xs text-neutral-400">{i.variant.product.shortCode}</span>
+                  {itemName(i)}
+                  {(i.variant?.product ?? i.product) ? (
+                    <span className="ml-2 font-mono text-xs text-neutral-400">{(i.variant?.product ?? i.product)!.shortCode}</span>
+                  ) : null}
                 </td>
-                <td className="px-4 py-2 text-neutral-600">{i.variant.sizeLabel}</td>
+                <td className="px-4 py-2 text-neutral-600">
+                  {itemSize(i)}
+                  {i.variantId ? null : (
+                    <span className="ml-2 text-xs font-medium text-amber-700" title="Size and price set by the salesperson at the shop">
+                      Custom
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2 text-right tabular-nums">{i.quantity}</td>
                 <td className="px-4 py-2 text-right tabular-nums">
                   {i.unitPrice > 0 ? formatINR(i.unitPrice) : <span className="text-red-600">Not priced</span>}
@@ -280,8 +295,65 @@ function OrderDetail({ order }: { order: Order }) {
         <Detail label="Order ID" value={<span className="font-mono text-xs">{order.id}</span>} />
         <Detail label="Customer phone" value={order.customerPhone || "—"} />
         <Detail label="Shop" value={order.shopName || "—"} />
+        <Detail label="How it was taken" value={<HowTaken order={order} long />} />
         <Detail label="Notes" value={order.notes || "—"} />
+        {order.voiceNote ? <Detail label="Voice note" value={<VoiceNote orderId={order.id} />} /> : null}
       </dl>
+    </div>
+  );
+}
+
+// An in-person order taken this far from its shop was probably not taken there.
+const FAR_FROM_STORE_M = 300;
+
+function metres(m: number) {
+  return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`;
+}
+
+// By phone, or in person with how far the salesperson's phone was from the shop.
+function HowTaken({ order, long = false }: { order: Order; long?: boolean }) {
+  if (order.channel === "phone") return <div className="text-xs font-medium text-neutral-700">By phone</div>;
+  if (!order.storeId) return long ? <div className="text-xs text-neutral-500">At the shop (not on the map)</div> : null;
+  if (order.distanceFromStoreM === null) {
+    return <div className="text-xs text-neutral-500">At the shop · position not recorded</div>;
+  }
+  const far = order.distanceFromStoreM > FAR_FROM_STORE_M;
+  return (
+    <div className={`text-xs ${far ? "font-semibold text-red-700" : "text-neutral-500"}`}>
+      {far
+        ? `Marked at the shop, but ${metres(order.distanceFromStoreM)} away`
+        : `At the shop · ${metres(order.distanceFromStoreM)} away`}
+    </div>
+  );
+}
+
+// The salesperson's recording of the customer, loaded when the order is opened.
+function VoiceNote({ orderId }: { orderId: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let url: string | null = null;
+    let live = true;
+    apiBlob(`/api/orders/${orderId}/voice-note`)
+      .then((blob) => {
+        url = URL.createObjectURL(blob);
+        if (live) setSrc(url);
+        else URL.revokeObjectURL(url);
+      })
+      .catch((e) => live && setError(e instanceof Error ? e.message : "Couldn't load the voice note"));
+    return () => {
+      live = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [orderId]);
+  if (error) return <span className="text-red-600">{error}</span>;
+  if (!src) return <span className="text-neutral-400">Loading…</span>;
+  return (
+    <div className="space-y-1">
+      <audio controls src={src} className="h-9 w-full" />
+      <a href={src} download={`voice-note-${orderId}.m4a`} className="text-xs text-brand-700 hover:underline">
+        Download
+      </a>
     </div>
   );
 }

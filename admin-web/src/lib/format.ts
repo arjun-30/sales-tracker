@@ -49,3 +49,17 @@ export function displayProductName(name: string): string {
     .trim()
     .replace(/(^|[\s(])([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
 }
+
+// An order line's product and size, for a catalogue size or a custom one
+// (variant null) the salesperson described and priced at the shop.
+export function itemName(i: {
+  variant: { product: { name: string } } | null;
+  product: { name: string } | null;
+  customName: string | null;
+}): string {
+  return displayProductName(i.variant?.product.name ?? i.product?.name ?? i.customName ?? "Custom item");
+}
+
+export function itemSize(i: { variant: { sizeLabel: string } | null; customSize: string | null }): string {
+  return i.variant ? i.variant.sizeLabel : i.customSize ?? "";
+}

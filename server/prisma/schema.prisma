@@ -28,6 +28,19 @@ enum OrderStatus {
   cancelled
 }
 
+// Taken standing in the shop, or over the phone without a visit.
+enum OrderChannel {
+  in_person
+  phone
+}
+
+// A shop a salesperson adds from the field waits for a plant admin to approve
+// it; the office's own (typed or imported) are approved straight away.
+enum StoreStatus {
+  pending
+  approved
+}
+
 model District {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -73,7 +86,7 @@ model PlantPrice {
 
 // A shop or dealer the plant supplies, pinned on the admin map.
 model Store {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   plantId     String
   name        String
   ownerName   String?
@@ -82,12 +95,14 @@ model Store {
   lat         Float
   lng         Float
   notes       String?
+  status      StoreStatus @default(approved)
   createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  plant     Plant @relation(fields: [plantId], references: [id])
-  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  plant     Plant   @relation(fields: [plantId], references: [id])
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  orders    Order[]
 
   @@index([plantId])
 }
@@ -134,13 +149,18 @@ model DutySession {
 }
 
 model EmployeeLocation {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  lat       Float
-  lng       Float
-  accuracy  Float?
-  onDuty    Boolean  @default(false)
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  lat             Float
+  lng             Float
+  accuracy        Float?
+  onDuty          Boolean   @default(false)
+  // Where the employee has stayed (within a GPS-drift radius) and since when,
+  // so the map can flag someone who hasn't moved for a long time.
+  anchorLat       Float?
+  anchorLng       Float?
+  stationarySince DateTime?
+  updatedAt       DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -166,7 +186,8 @@ model Product {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  variants ProductVariant[]
+  variants   ProductVariant[]
+  orderItems OrderItem[]
 }
 
 model ProductVariant {
@@ -187,41 +208,69 @@ model ProductVariant {
 }
 
 model Order {
-  id            String      @id @default(cuid())
-  employeeId    String
-  districtId    String
+  id                 String       @id @default(cuid())
+  employeeId         String
+  districtId         String
   // The salesperson's plant when the order was taken; a later transfer
   // leaves it with the plant it was taken for.
-  plantId       String
-  customerName  String
-  customerPhone String?
-  shopName      String?
-  totalAmount   Decimal     @db.Decimal(12, 2)
-  status        OrderStatus @default(pending)
-  notes         String?
-  lat           Float?
-  lng           Float?
-  createdAt     DateTime    @default(now())
+  plantId            String
+  customerName       String
+  customerPhone      String?
+  shopName           String?
+  totalAmount        Decimal      @db.Decimal(12, 2)
+  status             OrderStatus  @default(pending)
+  notes              String?
+  lat                Float?
+  lng                Float?
+  channel            OrderChannel @default(in_person)
+  // The shop on the map the order is for, when it is one. For an order taken
+  // in person, how far the phone was from that shop: the office's check that
+  // the salesperson was really there.
+  storeId            String?
+  distanceFromStoreM Int?
+  createdAt          DateTime     @default(now())
 
-  employee User        @relation(fields: [employeeId], references: [id])
-  district District    @relation(fields: [districtId], references: [id])
-  plant    Plant       @relation(fields: [plantId], references: [id])
-  items    OrderItem[]
+  store     Store?          @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  employee  User            @relation(fields: [employeeId], references: [id])
+  district  District        @relation(fields: [districtId], references: [id])
+  plant     Plant           @relation(fields: [plantId], references: [id])
+  items     OrderItem[]
+  voiceNote OrderVoiceNote?
 
   @@index([employeeId, createdAt])
   @@index([districtId, createdAt])
   @@index([plantId, createdAt])
 }
 
+// A catalogue size (variantId), or a custom line for a size or pack the
+// catalogue doesn't have, described and priced by the salesperson at the shop:
+// customSize ("15 L") of a catalogue product (productId) or of a product named
+// in customName.
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  variantId String
-  quantity  Int
-  unitPrice Decimal @db.Decimal(12, 2)
+  id         String  @id @default(cuid())
+  orderId    String
+  variantId  String?
+  productId  String?
+  customName String?
+  customSize String?
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(12, 2)
 
-  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variant ProductVariant @relation(fields: [variantId], references: [id])
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: Restrict)
+}
+
+// The customer's request recorded at the shop, for the office to listen to.
+// Kept in the database (a minute is ~250 KB) so the backups cover it.
+model OrderVoiceNote {
+  orderId    String   @id
+  mimeType   String
+  durationMs Int?
+  data       Bytes
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
 
 model Visit {

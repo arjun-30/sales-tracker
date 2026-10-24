@@ -59,7 +59,16 @@
           }
         }
       ],
-      "@react-native-vector-icons/ionicons"
+      "@react-native-vector-icons/ionicons",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Roalux Sales records a voice note of the customer's order when you tap Record.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ]
     ],
     "extra": {
       "eas": {
