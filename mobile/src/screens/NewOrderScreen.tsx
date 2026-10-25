@@ -67,7 +67,6 @@ export default function NewOrderScreen() {
   const [shopName, setShopName] = useState("");
   const [notes, setNotes] = useState("");
   const [voiceNote, setVoiceNote] = useState<RecordedNote | null>(null);
-  const [channel, setChannel] = useState<"in_person" | "phone">("in_person");
   const [stores, setStores] = useState<Store[]>([]);
   const [here, setHere] = useState<LatLng | null>(null);
   const [store, setStore] = useState<Store | null>(null);
@@ -114,7 +113,7 @@ export default function NewOrderScreen() {
 
   // How far the phone is from the chosen shop, for an order taken in person.
   const storeKm = store && here ? distanceKm(here, store) : null;
-  const farFromStore = channel === "in_person" && storeKm !== null && storeKm > FAR_FROM_STORE_KM;
+  const farFromStore = storeKm !== null && storeKm > FAR_FROM_STORE_KM;
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -239,7 +238,6 @@ export default function NewOrderScreen() {
         lat: pos?.lat,
         lng: pos?.lng,
         voiceNoteDurationMs: voiceNote?.durationMs,
-        channel,
         storeId: store?.id,
         items: cart.map((l) =>
           l.custom
@@ -292,29 +290,6 @@ export default function NewOrderScreen() {
         <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Step number={1} title="Customer" />
           <Card style={styles.card}>
-            <View>
-              <Text style={styles.fixedLabel}>How was this order taken?</Text>
-              <View style={styles.segment}>
-                {(
-                  [
-                    ["in_person", "At the shop", "storefront-outline"],
-                    ["phone", "Over the phone", "call-outline"],
-                  ] as const
-                ).map(([value, label, icon]) => (
-                  <TouchableOpacity
-                    key={value}
-                    style={[styles.segmentItem, channel === value && styles.segmentOn]}
-                    onPress={() => setChannel(value)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: channel === value }}
-                  >
-                    <Ionicons name={icon} size={17} color={channel === value ? "#fff" : colors.text} />
-                    <Text style={[styles.segmentText, channel === value && { color: "#fff" }]}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
             <View style={{ gap: 6 }}>
               <Text style={styles.fixedLabel}>Shop</Text>
               {store && !pickingStore ? (
@@ -379,8 +354,8 @@ export default function NewOrderScreen() {
               ) : null}
               {farFromStore ? (
                 <Text style={styles.farWarning}>
-                  You are {formatKm(storeKm!)} from this shop. If the customer gave this order over the phone, choose
-                  “Over the phone”. The office sees how far you were.
+                  You are {formatKm(storeKm!)} from this shop. Orders must be taken at the shop, and the office sees how
+                  far you were.
                 </Text>
               ) : null}
             </View>
@@ -694,21 +669,6 @@ const styles = StyleSheet.create({
   customLinkText: { fontSize: 14, fontWeight: "600", color: colors.primary, flexShrink: 1 },
   fixedLabel: { fontSize: 13, fontWeight: "600", color: colors.textMuted, marginBottom: 4 },
   fixedValue: { fontSize: 16, fontWeight: "600", color: colors.text },
-  segment: { flexDirection: "row", gap: 8 },
-  segmentItem: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    height: 44,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surface,
-  },
-  segmentOn: { backgroundColor: colors.text, borderColor: colors.text },
-  segmentText: { fontSize: 14, fontWeight: "600", color: colors.text },
   storeChosen: {
     flexDirection: "row",
     alignItems: "center",

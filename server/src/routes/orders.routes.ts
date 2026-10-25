@@ -57,7 +57,9 @@ const createSchema = z.object({
   notes: z.string().optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
-  channel: z.enum(["in_person", "phone"]).default("in_person"),
+  // Orders are only taken at the shop. Phone orders were dropped, and older
+  // app builds that still send "phone" are refused.
+  channel: z.literal("in_person", { errorMap: () => ({ message: "Orders can only be taken at the shop" }) }).default("in_person"),
   storeId: z.string().min(1).optional(),
   voiceNoteDurationMs: z.number().int().nonnegative().optional(),
   // A line with a variantId is a catalogue size, any other a custom line.
@@ -89,7 +91,7 @@ function orderBody(req: Request): unknown {
 ordersRouter.post("/", requireRole("sales_employee"), voiceUpload.single("voiceNote"), async (req, res) => {
   const parsed = createSchema.safeParse(orderBody(req));
   if (!parsed.success) {
-    const custom = parsed.error.issues.find((i) => i.code === "custom");
+    const custom = parsed.error.issues.find((i) => i.code === "custom" || i.path[0] === "channel");
     return res.status(400).json({ error: custom?.message ?? parsed.error.flatten() });
   }
   const { customerName, customerPhone, shopName, notes, lat, lng, items, voiceNoteDurationMs, channel, storeId } =

@@ -112,11 +112,11 @@ describe("in-person and phone orders", () => {
     expect(res.body.order.distanceFromStoreM).toBeLessThan(1200);
   });
 
-  it("a phone order is marked as one and not measured against the shop", async () => {
+  it("refuses a phone order", async () => {
     const s = await approvedShop();
     const res = await order({ storeId: s.id, channel: "phone", lat: 12.9, lng: 80.1 });
-    expect(res.status).toBe(201);
-    expect(res.body.order).toMatchObject({ channel: "phone", distanceFromStoreM: null });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Orders can only be taken at the shop");
   });
 
   it("refuses another plant's shop", async () => {
