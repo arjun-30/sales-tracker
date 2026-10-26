@@ -98,6 +98,9 @@ const STAFF = [
   { plant: "CBE", phone: "9000000006", name: "Manikandan S", district: "Salem" },
 ];
 
+// Demo districts whose centre is close to the sea on the east.
+const COASTAL_DISTRICTS = new Set(["Chennai", "Cuddalore"]);
+
 const SHOP_PREFIX = ["Sri", "New", "Om", "Jai", "Royal", "Sree", "Lakshmi", "Balaji", "Ganesh", "Murugan"];
 const SHOP_NAME = ["Paints", "Hardwares", "Paint House", "Traders", "Colour World", "Agencies", "Building Materials", "Enterprises"];
 const OWNERS = [
@@ -221,7 +224,8 @@ async function main() {
       owner: pick(OWNERS),
       phone: `9${int(100000000, 999999999)}`,
       lat: district.centerLat + between(-0.06, 0.06),
-      lng: district.centerLng + between(-0.06, 0.06),
+      // On the coast the sea is a few km east of the centre, so shops only go west.
+      lng: district.centerLng + (COASTAL_DISTRICTS.has(district.name) ? between(-0.08, 0) : between(-0.06, 0.06)),
     }));
     // Most shops they visit are stores the plant already has on its map.
     for (const shop of shops.slice(0, 9)) {
