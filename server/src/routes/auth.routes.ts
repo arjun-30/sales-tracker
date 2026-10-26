@@ -22,7 +22,7 @@ authRouter.post("/login", loginPerIpLimiter, loginPerPhoneLimiter, async (req, r
 
   const user = await prisma.user.findUnique({
     where: { phone },
-    include: { plant: { select: { id: true, name: true, code: true } } },
+    include: { district: true, plant: { select: { id: true, name: true, code: true } } },
   });
   if (!user || !user.active) {
     return res.status(401).json({ error: "Invalid credentials" });
@@ -46,6 +46,8 @@ authRouter.post("/login", loginPerIpLimiter, loginPerPhoneLimiter, async (req, r
       employeeCode: user.employeeCode,
       role: user.role,
       districtId: user.districtId,
+      // Same shape as /me, so the app shows the district straight after login.
+      district: user.district,
       plantId: user.plantId,
       plant: user.plant,
     },
