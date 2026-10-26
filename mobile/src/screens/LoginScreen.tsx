@@ -326,7 +326,7 @@ export function ServerSetting() {
           setDraft(t);
           setStatus(null);
         }}
-        placeholder="192.168.1.5:4010"
+        placeholder="192.168.1.5:4000"
         placeholderTextColor={colors.textFaint}
         autoCapitalize="none"
         autoCorrect={false}

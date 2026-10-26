@@ -15,11 +15,11 @@ export async function getApiUrl(): Promise<string> {
   return url;
 }
 
-// "192.168.1.5" → "http://192.168.1.5:4010"; full URLs are kept as typed.
+// "192.168.1.5" → "http://192.168.1.5:4000"; full URLs are kept as typed.
 export function normalizeServerUrl(input: string): string {
   let url = input.trim().replace(/\/+$/, "");
   if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
-  if (/^http:\/\/[\d.]+$/.test(url)) url = `${url}:4010`;
+  if (/^http:\/\/[\d.]+$/.test(url)) url = `${url}:4000`;
   return url;
 }
 
