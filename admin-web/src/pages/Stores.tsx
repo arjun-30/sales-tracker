@@ -256,13 +256,23 @@ export function Stores() {
   const pending = useMemo(() => stores.filter((s) => s.status === "pending"), [stores]);
   const approved = useMemo(() => stores.filter((s) => s.status === "approved"), [stores]);
 
+  // Shops whose next visit is today or past (from the home page: /stores?due=1).
+  const [dueOnly, setDueOnly] = useState(() => new URLSearchParams(window.location.search).get("due") === "1");
+  const todayIst = new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
+  const dueCount = approved.filter((s) => s.nextVisitOn && s.nextVisitOn.slice(0, 10) <= todayIst).length;
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return approved;
-    return approved.filter((s) =>
+    const base = dueOnly
+      ? approved
+          .filter((s) => s.nextVisitOn && s.nextVisitOn.slice(0, 10) <= todayIst)
+          .sort((a, b) => a.nextVisitOn!.localeCompare(b.nextVisitOn!))
+      : approved;
+    if (!q) return base;
+    return base.filter((s) =>
       [s.name, s.ownerName, s.phone, s.address, s.plant.name].some((v) => v?.toLowerCase().includes(q))
     );
-  }, [approved, query]);
+  }, [approved, query, dueOnly, todayIst]);
 
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const addedThisWeek = approved.filter((s) => new Date(s.createdAt).getTime() > weekAgo).length;
@@ -296,7 +306,7 @@ export function Stores() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Stores"
+        title="Shops"
         description="Shops and dealers on the Live Map. Paste a Google Maps link to place one, import a list from Excel, or approve the ones salespeople add from the field."
         actions={
           editing === null && !importing ? (
@@ -357,7 +367,7 @@ export function Stores() {
                     {s.ownerName ? <div className="text-xs text-neutral-500">{s.ownerName}</div> : null}
                   </Td>
                   <Td className="tabular-nums">
-                    {s.phone ?? <span className="text-neutral-400">—</span>}
+                    {s.phone ?? <span className="text-neutral-400">-</span>}
                     {s.phoneVerifiedAt ? (
                       <div className="text-xs text-emerald-700" title="The owner received the SMS code and read it back">
                         Checked by SMS code
@@ -365,7 +375,7 @@ export function Stores() {
                     ) : null}
                   </Td>
                   <Td className="max-w-72">
-                    <div className="truncate">{s.address ?? <span className="text-neutral-400">—</span>}</div>
+                    <div className="truncate">{s.address ?? <span className="text-neutral-400">-</span>}</div>
                     <a
                       href={mapsLink(s)}
                       target="_blank"
@@ -376,7 +386,7 @@ export function Stores() {
                     </a>
                   </Td>
                   <Td>
-                    <div>{s.createdBy?.name ?? "—"}</div>
+                    <div>{s.createdBy?.name ?? "-"}</div>
                     <div className="text-xs text-neutral-500">{formatDate(s.createdAt)}</div>
                   </Td>
                   <Td className="text-right">
@@ -421,10 +431,19 @@ export function Stores() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search store, owner, phone or address"
+              placeholder="Search shop, owner, phone or address"
               className="pl-9"
             />
           </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-neutral-700">
+            <input
+              type="checkbox"
+              checked={dueOnly}
+              onChange={(e) => setDueOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-neutral-300 accent-brand-600"
+            />
+            Only shops due for a visit ({dueCount})
+          </label>
           <div className="ml-auto text-[13px] text-neutral-500">
             {visible.length} of {approved.length}
           </div>
@@ -456,7 +475,7 @@ export function Stores() {
                     {s.ownerName ? <div className="text-xs text-neutral-500">{s.ownerName}</div> : null}
                   </Td>
                   <Td className="tabular-nums">
-                    {s.phone ?? <span className="text-neutral-400">—</span>}
+                    {s.phone ?? <span className="text-neutral-400">-</span>}
                     {s.phoneVerifiedAt ? (
                       <div className="text-xs text-emerald-700" title="The owner received the SMS code and read it back">
                         Checked by SMS code
@@ -464,7 +483,7 @@ export function Stores() {
                     ) : null}
                   </Td>
                   <Td className="max-w-72">
-                    <div className="truncate">{s.address ?? <span className="text-neutral-400">—</span>}</div>
+                    <div className="truncate">{s.address ?? <span className="text-neutral-400">-</span>}</div>
                     {s.gstin ? <div className="font-mono text-xs text-neutral-500">GSTIN {s.gstin}</div> : null}
                     <a
                       href={mapsLink(s)}
@@ -504,7 +523,7 @@ export function Stores() {
 
 // Due today or overdue in red, so the office can chase it; a later date plainly.
 function NextVisit({ on }: { on: string | null }) {
-  if (!on) return <span className="text-neutral-400">—</span>;
+  if (!on) return <span className="text-neutral-400">-</span>;
   const day = on.slice(0, 10);
   const today = new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
   const label = new Date(`${day}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });

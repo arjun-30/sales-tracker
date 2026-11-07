@@ -109,7 +109,7 @@ function PriceEditor({
                 <span className="mt-1 flex items-center justify-between gap-1 text-[11px] text-neutral-500">
                   {v.plantPrice !== null ? (
                     <>
-                      <span>Company {v.basePrice > 0 ? formatINR(v.basePrice) : "—"}</span>
+                      <span>Company {v.basePrice > 0 ? formatINR(v.basePrice) : "-"}</span>
                       <button
                         type="button"
                         onClick={() => revertToCompanyPrice(v)}
@@ -381,7 +381,7 @@ export function Products() {
                                     {formatINR(v.price)}
                                   </span>
                                 ) : (
-                                  <span className="font-medium text-red-600">—</span>
+                                  <span className="font-medium text-red-600">-</span>
                                 )}
                               </span>
                             ))}

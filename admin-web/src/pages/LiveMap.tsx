@@ -607,7 +607,7 @@ export function LiveMap() {
             <div className="pointer-events-none absolute bottom-6 left-4 z-10 flex items-center gap-4 rounded-lg border border-neutral-200 bg-white/95 px-3 py-2 text-xs text-neutral-600 shadow-md backdrop-blur">
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_ACTIVE }} />
-                Active
+                Working
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_STALE }} />
@@ -618,12 +618,12 @@ export function LiveMap() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-70" style={{ backgroundColor: COLOR_STILL }} />
                   <span className="relative h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR_STILL }} />
                 </span>
-                Same place 1 h+
+                Not moving 1 h+
               </span>
               {showStores && stores.length > 0 ? (
                 <span className="flex items-center gap-1.5">
                   <img src={STORE_PIN_URL} alt="" className="h-4 w-auto" />
-                  Store
+                  Shop
                 </span>
               ) : null}
             </div>
@@ -634,8 +634,8 @@ export function LiveMap() {
       <aside className="flex w-full flex-col border-t border-neutral-200 bg-white lg:h-screen lg:w-80 lg:border-l lg:border-t-0">
         <div className="space-y-3 border-b border-neutral-100 px-4 py-4">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-neutral-900">Live Map</h1>
-            <p className="text-xs text-neutral-500">Real-time positions of field sales staff.</p>
+            <h1 className="text-lg font-semibold tracking-tight text-neutral-900">Live map</h1>
+            <p className="text-xs text-neutral-500">Where your salespeople are right now. Point at a box below to see what it means.</p>
           </div>
           <Select value={districtFilter} onChange={(e) => setDistrictFilter(e.target.value)}>
             <option value="">All districts</option>
@@ -646,10 +646,10 @@ export function LiveMap() {
             ))}
           </Select>
           <div className="grid grid-cols-4 gap-2 text-center">
-            <Stat label="Active" value={activeCount} tone="text-brand-600" />
-            <Stat label="Same place" value={stillCount} tone="text-red-600" />
-            <Stat label="No signal" value={staleCount} tone="text-neutral-500" />
-            <Stat label="Offline" value={offline.length} tone="text-neutral-400" />
+            <Stat label="Working" hint="On duty, phone sending its position" value={activeCount} tone="text-brand-600" />
+            <Stat label="Not moving" hint="In the same place for over an hour" value={stillCount} tone="text-red-600" />
+            <Stat label="No signal" hint="No position for 10+ minutes: phone off or no network" value={staleCount} tone="text-neutral-500" />
+            <Stat label="Lost touch" hint="On duty but silent for over 2 hours: app closed or phone dead" value={offline.length} tone="text-neutral-400" />
           </div>
           <div className="flex items-center justify-between rounded-lg border border-neutral-200 px-3 py-2">
             <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
@@ -663,7 +663,7 @@ export function LiveMap() {
                 className="h-4 w-4 accent-brand-600"
               />
               <Building2 className="h-4 w-4 text-neutral-500" />
-              Show stores
+              Show shops
               <span className="tabular-nums text-neutral-400">{stores.length}</span>
             </label>
             <Link to="/stores" className="text-xs font-medium text-brand-600 hover:underline">
@@ -753,9 +753,9 @@ export function LiveMap() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
+function Stat({ label, hint, value, tone }: { label: string; hint: string; value: number; tone: string }) {
   return (
-    <div className="rounded-lg bg-neutral-50 px-2 py-2">
+    <div className="cursor-help rounded-lg bg-neutral-50 px-2 py-2" title={hint}>
       <div className={`text-lg font-semibold leading-none ${tone}`}>{value}</div>
       <div className="mt-1 text-[11px] text-neutral-500">{label}</div>
     </div>

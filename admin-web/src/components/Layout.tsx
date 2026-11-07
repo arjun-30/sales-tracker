@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   CalendarCheck,
+  House,
   Clock,
   Factory,
   LogOut,
@@ -43,33 +44,35 @@ function usePendingStores(plantId: string, pathname: string) {
   return count;
 }
 
-type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; superOnly?: boolean };
+// hint: what the page is for, shown when hovering the link.
+type NavItem = { to: string; label: string; hint: string; icon: LucideIcon; end?: boolean; superOnly?: boolean };
 
 const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: "Overview",
     items: [
-      { to: "/", label: "Live Map", icon: MapPinned, end: true },
-      { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
+      { to: "/", label: "Today", hint: "What needs doing and how today is going", icon: House, end: true },
+      { to: "/live-map", label: "Live map", hint: "Where every salesperson on duty is right now", icon: MapPinned },
+      { to: "/dashboard", label: "Sales reports", hint: "Sales by district, product and salesperson", icon: BarChart3 },
     ],
   },
   {
-    label: "Sales",
+    label: "Orders & shops",
     items: [
-      { to: "/orders", label: "Orders", icon: Receipt },
-      { to: "/visits", label: "Shop Visits", icon: Store },
-      { to: "/stores", label: "Stores", icon: Building2 },
-      { to: "/products", label: "Products & Prices", icon: Package },
-      { to: "/messages", label: "Messages", icon: MessageSquare },
+      { to: "/orders", label: "Orders", hint: "Confirm, dispatch, deliver and print orders", icon: Receipt },
+      { to: "/visits", label: "Shop visits", hint: "Check-ins, payments collected and next visits", icon: Store },
+      { to: "/stores", label: "Shops", hint: "Shops on the map; approve ones added in the field", icon: Building2 },
+      { to: "/products", label: "Products & prices", hint: "Price list, plant prices and colour shades", icon: Package },
+      { to: "/messages", label: "SMS & WhatsApp", hint: "Every message sent to shop owners and admins", icon: MessageSquare },
     ],
   },
   {
     label: "Team",
     items: [
-      { to: "/employees", label: "Employees", icon: Users },
-      { to: "/staff-attendance", label: "Staff attendance", icon: CalendarCheck },
-      { to: "/attendance", label: "Employee history", icon: Clock },
-      { to: "/plants", label: "Plants & Admins", icon: Factory, superOnly: true },
+      { to: "/employees", label: "Salespeople", hint: "Add staff, reset passwords, change district", icon: Users },
+      { to: "/staff-attendance", label: "Attendance", hint: "Who worked which day this month", icon: CalendarCheck },
+      { to: "/attendance", label: "Day history", hint: "One salesperson: route, stops, orders and hours", icon: Clock },
+      { to: "/plants", label: "Plants & admins", hint: "Plants and their admin logins", icon: Factory, superOnly: true },
     ],
   },
 ];
@@ -82,7 +85,7 @@ function PlantSwitcher() {
     return (
       <div className="rounded-md border border-sand-200 bg-white/60 px-3 py-2">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-sand-500">Plant</div>
-        <div className="truncate text-[13.5px] font-semibold text-sand-900">{plant?.name ?? "—"}</div>
+        <div className="truncate text-[13.5px] font-semibold text-sand-900">{plant?.name ?? "-"}</div>
       </div>
     );
   }
@@ -111,7 +114,7 @@ export function Layout() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   // The live map fills the whole content area instead of the padded column.
-  const fullBleed = pathname === "/";
+  const fullBleed = pathname === "/live-map";
   const pendingStores = usePendingStores(plantId, pathname);
 
   const initials = (user?.name ?? "?")
@@ -146,11 +149,12 @@ export function Layout() {
             <div className="space-y-0.5">
               {group.items
                 .filter((item) => isSuperAdmin || !item.superOnly)
-                .map(({ to, label, icon: Icon, end }) => (
+                .map(({ to, label, hint, icon: Icon, end }) => (
                 <NavLink
                   key={to}
                   to={to}
                   end={end}
+                  title={hint}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
                     `relative flex h-9 items-center gap-3 rounded-md px-3 text-[13.5px] transition-colors ${

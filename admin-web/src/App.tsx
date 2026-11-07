@@ -13,6 +13,7 @@ import { Stores } from "./pages/Stores";
 import { Plants } from "./pages/Plants";
 import { Messages } from "./pages/Messages";
 import { StaffAttendance } from "./pages/StaffAttendance";
+import { Home } from "./pages/Home";
 
 function App() {
   return (
@@ -26,7 +27,8 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<LiveMap />} />
+        <Route index element={<Home />} />
+        <Route path="live-map" element={<LiveMap />} />
         <Route path="orders" element={<Orders />} />
         <Route path="visits" element={<Visits />} />
         <Route path="employees" element={<Employees />} />

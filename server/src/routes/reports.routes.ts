@@ -5,6 +5,7 @@ import { prisma } from "../db";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import { plantFilter } from "../lib/scope";
 import { istDateKey, workedByDay } from "../lib/attendance";
+import { dayEndLabel } from "../lib/dutySweep";
 
 export const reportsRouter = Router();
 
@@ -355,4 +356,93 @@ reportsRouter.get("/attendance", async (req, res) => {
     .filter((r) => r.employee.active || r.totalMinutes > 0);
 
   res.json({ month: parsed.data.month, dates, fullDayMinutes: FULL_DAY_MINUTES, today: istDateKey(now), rows });
+});
+
+// The home page: what happened today (IST) and what is waiting on the office,
+// as plain counts the dashboard turns into sentences with links.
+const STATIONARY_ALERT_MS = 60 * 60 * 1000;
+const DELIVERY_LATE_MS = 2 * 24 * 60 * 60 * 1000;
+
+reportsRouter.get("/today", async (req, res) => {
+  const plant = plantFilter(req);
+  const now = new Date();
+  // Midnight IST today.
+  const dayStart = new Date(new Date(`${istDateKey(now)}T00:00:00.000Z`).getTime() - IST_OFFSET_MS);
+  // Store.nextVisitOn is a calendar date (midnight UTC of the IST day).
+  const todayDate = new Date(`${istDateKey(now)}T00:00:00.000Z`);
+  const tomorrowDate = new Date(todayDate.getTime() + 24 * 60 * 60 * 1000);
+
+  const [
+    staffTotal,
+    onDuty,
+    stationary,
+    orderAgg,
+    visitsToday,
+    paymentAgg,
+    newShopsToday,
+    pending,
+    oldestPending,
+    toDispatch,
+    lateDeliveries,
+    shopsWaiting,
+    dueToday,
+    overdue,
+    failedMessages,
+    farOrders,
+  ] = await Promise.all([
+    prisma.user.count({ where: { role: "sales_employee", active: true, ...plant } }),
+    prisma.employeeLocation.count({ where: { onDuty: true, user: plant } }),
+    prisma.employeeLocation.count({
+      where: { onDuty: true, user: plant, stationarySince: { lte: new Date(now.getTime() - STATIONARY_ALERT_MS) } },
+    }),
+    prisma.order.aggregate({
+      where: { ...plant, createdAt: { gte: dayStart }, status: { not: "cancelled" } },
+      _sum: { totalAmount: true },
+      _count: true,
+    }),
+    prisma.visit.count({ where: { ...plant, checkInAt: { gte: dayStart } } }),
+    prisma.visit.aggregate({
+      where: { ...plant, checkOutAt: { gte: dayStart }, paymentAmount: { gt: 0 } },
+      _sum: { paymentAmount: true },
+      _count: true,
+    }),
+    prisma.store.count({ where: { ...plant, createdAt: { gte: dayStart } } }),
+    prisma.order.count({ where: { ...plant, status: "pending" } }),
+    prisma.order.findFirst({ where: { ...plant, status: "pending" }, orderBy: { createdAt: "asc" }, select: { createdAt: true } }),
+    prisma.order.count({ where: { ...plant, status: "confirmed" } }),
+    prisma.order.count({
+      where: { ...plant, status: "dispatched", dispatchedAt: { lte: new Date(now.getTime() - DELIVERY_LATE_MS) } },
+    }),
+    prisma.store.count({ where: { ...plant, status: "pending" } }),
+    prisma.store.count({ where: { ...plant, status: "approved", nextVisitOn: { gte: todayDate, lt: tomorrowDate } } }),
+    prisma.store.count({ where: { ...plant, status: "approved", nextVisitOn: { lt: todayDate } } }),
+    prisma.outboundMessage.count({
+      where: { ...plant, status: "failed", createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
+    }),
+    prisma.order.count({ where: { ...plant, createdAt: { gte: dayStart }, distanceFromStoreM: { gt: 300 } } }),
+  ]);
+
+  res.json({
+    staff: { total: staffTotal, onDuty, stationary },
+    today: {
+      orders: orderAgg._count,
+      sales: Number(orderAgg._sum.totalAmount ?? 0),
+      visits: visitsToday,
+      paymentsCount: paymentAgg._count,
+      paymentsTotal: Number(paymentAgg._sum.paymentAmount ?? 0),
+      newShops: newShopsToday,
+      farOrders,
+    },
+    waiting: {
+      pendingOrders: pending,
+      oldestPendingAt: oldestPending?.createdAt ?? null,
+      toDispatch,
+      lateDeliveries,
+      shopsWaiting,
+      shopsDueToday: dueToday,
+      shopsOverdue: overdue,
+      failedMessages,
+    },
+    dayEndsAt: `${dayEndLabel()}`,
+  });
 });

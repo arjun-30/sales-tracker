@@ -82,7 +82,7 @@ export function Attendance() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Employee history"
+        title="Day history"
         description="Look up a salesperson by employee code: hours on duty, the route they took each day, and every order, visit and shop they added."
       />
 
@@ -141,7 +141,7 @@ export function Attendance() {
                 <div className="font-mono text-xs tracking-wider text-neutral-500">{emp.employeeCode}</div>
               </div>
             </div>
-            <Field label="District" value={emp.district?.name ?? "—"} />
+            <Field label="District" value={emp.district?.name ?? "-"} />
             <Field label="Phone" value={emp.phone} />
             <Field
               label="Right now"

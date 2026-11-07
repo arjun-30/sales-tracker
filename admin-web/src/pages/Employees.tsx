@@ -131,7 +131,7 @@ export function Employees() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Employees"
+        title="Salespeople"
         description={
           currentPlant
             ? `Field sales staff at ${currentPlant.name}, their codes, districts and today's duty.`
@@ -270,13 +270,13 @@ export function Employees() {
                 return (
                   <Tr key={emp.id} className={emp.active ? "" : "opacity-60"}>
                     <Td className="font-mono text-[13px] font-semibold tracking-wider text-neutral-900">
-                      {emp.employeeCode ?? "—"}
+                      {emp.employeeCode ?? "-"}
                     </Td>
                     <Td>
                       <div className="font-medium text-neutral-900">{emp.name}</div>
                       <div className="text-xs tabular-nums text-neutral-500">{emp.phone}</div>
                     </Td>
-                    <Td>{emp.district?.name ?? "—"}</Td>
+                    <Td>{emp.district?.name ?? "-"}</Td>
                     {isSuperAdmin ? (
                       <Td>
                         <Select
@@ -304,7 +304,7 @@ export function Employees() {
                       )}
                     </Td>
                     <Td className="text-right font-semibold tabular-nums text-neutral-900">
-                      {emp.minutesToday > 0 ? formatMinutes(emp.minutesToday) : <span className="text-neutral-400">—</span>}
+                      {emp.minutesToday > 0 ? formatMinutes(emp.minutesToday) : <span className="text-neutral-400">-</span>}
                     </Td>
                     <Td>{emp.active ? <Status tone="green">Active</Status> : <Status tone="red">Disabled</Status>}</Td>
                     <Td className="text-right">

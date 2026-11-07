@@ -1,20 +1,8 @@
 import { useEffect, useState } from "react";
 import { CalendarDays, Clock, IndianRupee, Receipt, Store, UserCheck } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Link } from "react-router-dom";
+import { displayProductName } from "../lib/format";
 import { api } from "../lib/api";
 import type { District, ReportSummary } from "../lib/types";
 import { Card, CardHeader, PageHeader, Segmented, StatCard } from "../components/ui/Card";
@@ -22,14 +10,15 @@ import { Table, Td, Th, Tr } from "../components/ui/Table";
 import { usePlant } from "../context/PlantContext";
 import { Select } from "../components/ui/Input";
 
-// Primary series in cobalt, warm brown for the second; categories get distinct hues.
 const COBALT = "#0047ab";
-const BROWN = "#8a7458";
-const PALETTE = ["#0047ab", "#bfa98a", "#4db848", "#f5921e", "#00a6e6", "#e5007d", "#d4b800", "#a3a3a3"];
+
+// In the order an order moves through them.
+const STATUS_ORDER = ["pending", "confirmed", "dispatched", "delivered", "cancelled"];
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: "Pending",
-  confirmed: "Confirmed",
+  pending: "Waiting to be confirmed",
+  confirmed: "Confirmed, not sent yet",
+  dispatched: "On the way",
   delivered: "Delivered",
   cancelled: "Cancelled",
 };
@@ -37,6 +26,7 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   pending: "#d97706",
   confirmed: "#0284c7",
+  dispatched: "#4338ca",
   delivered: "#16a34a",
   cancelled: "#dc2626",
 };
@@ -102,7 +92,7 @@ export function Dashboard() {
   if (!summary) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Dashboard" actions={filters} />
+        <PageHeader title="Sales reports" actions={filters} />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-28 animate-pulse rounded-lg bg-neutral-200/60" />
@@ -133,7 +123,7 @@ export function Dashboard() {
   return (
     <div className={`space-y-6 transition-opacity ${loading ? "opacity-60" : ""}`}>
       <PageHeader
-        title="Dashboard"
+        title="Sales reports"
         description={
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4" />
@@ -145,7 +135,7 @@ export function Dashboard() {
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Orders" value={summary.totalOrders.toLocaleString("en-IN")} icon={Receipt} hint="Cancelled orders excluded" />
+        <StatCard label="Orders" value={summary.totalOrders.toLocaleString("en-IN")} icon={Receipt} hint="Not counting cancelled orders" />
         <StatCard
           label="Sales"
           value={formatCurrency(summary.totalSales)}
@@ -153,7 +143,7 @@ export function Dashboard() {
           accent
           hint={
             summary.totalOrders
-              ? `Avg ${formatCurrency(Math.round(summary.totalSales / summary.totalOrders))} per order`
+              ? `About ${formatCurrency(Math.round(summary.totalSales / summary.totalOrders))} per order`
               : undefined
           }
         />
@@ -163,7 +153,7 @@ export function Dashboard() {
           icon={Store}
           hint={
             summary.totalVisits
-              ? `${(summary.totalOrders / summary.totalVisits).toFixed(1)} orders per visit`
+              ? `${Math.round((summary.totalOrders / summary.totalVisits) * 10)} orders for every 10 visits`
               : undefined
           }
         />
@@ -171,19 +161,19 @@ export function Dashboard() {
           label="On duty now"
           value={summary.activeEmployees}
           icon={UserCheck}
-          hint="Live count, ignores filters"
+          hint="Live, not filtered by date"
         />
       </div>
 
       {summary.plantComparison && summary.plantComparison.length > 0 ? (
         <Card className="overflow-x-auto">
-          <CardHeader title="Plants" description={`Sales and activity per plant, ${periodLabel}. Open one to see only that plant.`} />
+          <CardHeader title="Plants" description={`How each plant is doing, ${periodLabel}. Press Open to see only that plant.`} />
           <Table>
             <thead>
               <tr>
                 <Th>Plant</Th>
                 <Th className="text-right">Sales</Th>
-                <Th className="text-right">Share</Th>
+                <Th className="text-right">Share of sales</Th>
                 <Th className="text-right">Orders</Th>
                 <Th className="text-right">Visits</Th>
                 <Th className="text-right">Staff</Th>
@@ -231,7 +221,7 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Sales by district" />
+          <CardHeader title="Sales by district" description="Value of orders from each district. Taller bar, more sales." />
           <div className="p-4">
           {!hasSalesValue ? (
             <EmptyState text={noValueText} />
@@ -241,7 +231,7 @@ export function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
               <XAxis dataKey="districtName" tick={{ fontSize: 11 }} interval={0} angle={-30} textAnchor="end" height={70} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={compactINR} width={56} />
-              <Tooltip formatter={(value) => formatCurrency(value)} cursor={{ fill: "#f5f5f5" }} />
+              <Tooltip formatter={(value) => [formatCurrency(value), "Sales"]} cursor={{ fill: "#f5f5f5" }} />
               <Bar dataKey="totalSales" fill={COBALT} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -250,7 +240,7 @@ export function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader title="Sales over time" description="Daily order value, cancelled orders excluded" />
+          <CardHeader title="Sales over time" description="Value of orders taken each day. Point at the line to see the day." />
           <div className="p-4">
           {!hasSalesValue ? (
             <EmptyState text={noValueText} />
@@ -258,9 +248,9 @@ export function Dashboard() {
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={summary.ordersOverTime}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="day" tick={{ fontSize: 11 }} tickFormatter={shortDay} minTickGap={24} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={compactINR} width={56} />
-              <Tooltip formatter={(value) => formatCurrency(value)} />
+              <Tooltip formatter={(value) => [formatCurrency(value), "Sales"]} labelFormatter={(d) => longDay(String(d))} />
               <Line type="monotone" dataKey="total" stroke={COBALT} strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -272,65 +262,51 @@ export function Dashboard() {
       {/* Top products & categories */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Top products by revenue" />
-          <div className="p-4">
-          {!hasSalesValue ? (
-            <EmptyState text={noValueText} />
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={summary.topProducts} layout="vertical" margin={{ left: 24 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={compactINR} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={160} />
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Bar dataKey="revenue" fill={BROWN} radius={[0, 2, 2, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+          <CardHeader title="Best-selling products" description="The products that brought in the most money." />
+          <div className="p-5">
+            {!hasSalesValue ? (
+              <EmptyState text={noValueText} />
+            ) : (
+              <RankList
+                rows={summary.topProducts.map((p) => ({
+                  key: p.productId,
+                  label: displayProductName(p.name),
+                  sub: `${p.quantity.toLocaleString("en-IN")} packs`,
+                  value: p.revenue,
+                }))}
+                total={summary.totalSales}
+              />
+            )}
           </div>
         </Card>
 
         <Card>
-          <CardHeader title="Revenue by category" />
-          <div className="p-4">
-          {!hasSalesValue ? (
-            <EmptyState text={noValueText} />
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={summary.revenueByCategory}
-                  dataKey="revenue"
-                  nameKey="category"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  label={(props: PieLabelProps) => `${props.category} ${((props.percent ?? 0) * 100).toFixed(0)}%`}
-                >
-                  {summary.revenueByCategory.map((entry, i) => (
-                    <Cell key={entry.category} fill={PALETTE[i % PALETTE.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
+          <CardHeader title="Sales by type of product" description="How sales split between emulsions, primers, putty and so on." />
+          <div className="p-5">
+            {!hasSalesValue ? (
+              <EmptyState text={noValueText} />
+            ) : (
+              <RankList
+                rows={summary.revenueByCategory.map((c) => ({ key: c.category, label: c.category, value: c.revenue }))}
+                total={summary.revenueByCategory.reduce((sum, c) => sum + c.revenue, 0)}
+              />
+            )}
           </div>
         </Card>
       </div>
 
       {/* Employee performance */}
       <Card className="overflow-x-auto">
-        <CardHeader title="Employee leaderboard" description="Ranked by sales in the selected period." />
+        <CardHeader title="Salespeople" description="Ranked by the value of orders they took in this period." />
         <table className="w-full text-left text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
             <tr>
               <th className="px-5 py-3 font-medium">#</th>
-              <th className="px-5 py-3 font-medium">Employee</th>
+              <th className="px-5 py-3 font-medium">Salesperson</th>
               <th className="px-5 py-3 font-medium">Orders</th>
               <th className="px-5 py-3 font-medium">Sales</th>
-              <th className="px-5 py-3 font-medium">Visits</th>
-              <th className="px-5 py-3 font-medium">Orders per visit</th>
+              <th className="px-5 py-3 font-medium">Shop visits</th>
+              <th className="px-5 py-3 font-medium" title="How many orders they take for every 10 shop visits">Orders per 10 visits</th>
             </tr>
           </thead>
           <tbody>
@@ -349,7 +325,7 @@ export function Dashboard() {
                 <td className="px-5 py-3 font-medium tabular-nums text-neutral-900">{formatCurrency(emp.totalSales)}</td>
                 <td className="px-5 py-3">{emp.visitsCount}</td>
                 <td className="px-5 py-3">
-                  {emp.conversionRate === null ? "—" : emp.conversionRate.toFixed(1)}
+                  {emp.conversionRate === null ? "-" : Math.round(emp.conversionRate * 10)}
                 </td>
               </tr>
             ))}
@@ -360,53 +336,40 @@ export function Dashboard() {
       {/* Order status & stuck orders */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Order status" />
-          <div className="p-4">
-          {summary.orderStatusBreakdown.length === 0 ? (
-            <EmptyState text="No orders yet." />
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie
-                  data={summary.orderStatusBreakdown}
-                  dataKey="count"
-                  nameKey="status"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  label={(props: PieLabelProps) => {
-                    const status = props.status ?? "";
-                    return `${STATUS_LABEL[status] ?? status} (${props.count})`;
-                  }}
-                >
-                  {summary.orderStatusBreakdown.map((entry) => (
-                    <Cell key={entry.status} fill={STATUS_COLOR[entry.status] ?? "#737373"} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend formatter={(value: string) => STATUS_LABEL[value] ?? value} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
+          <CardHeader title="Where orders are" description="Every order in this period, by what has happened to it." />
+          <div className="p-5">
+            {summary.orderStatusBreakdown.length === 0 ? (
+              <EmptyState text="No orders yet." />
+            ) : (
+              <StatusBreakdown rows={summary.orderStatusBreakdown} />
+            )}
           </div>
         </Card>
 
         <Card className="overflow-x-auto">
-          <CardHeader title="Pending orders" description="Oldest first. Red means waiting more than 2 days." />
+          <CardHeader
+            title="Orders waiting to be confirmed"
+            description="Oldest first. Red means it has waited more than 2 days."
+            actions={
+              <Link to="/orders?tab=pending" className="text-[13px] font-medium text-brand-700 hover:underline">
+                Open orders
+              </Link>
+            }
+          />
           <table className="w-full text-left text-sm">
             <thead className="border-b border-neutral-200 bg-neutral-50 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               <tr>
                 <th className="px-5 py-3 font-medium">Customer</th>
-                <th className="px-5 py-3 font-medium">Employee</th>
+                <th className="px-5 py-3 font-medium">Taken by</th>
                 <th className="px-5 py-3 font-medium">Amount</th>
-                <th className="px-5 py-3 font-medium">Age</th>
+                <th className="px-5 py-3 font-medium">Waiting</th>
               </tr>
             </thead>
             <tbody>
               {summary.stuckPendingOrders.length === 0 && (
                 <tr>
                   <td className="px-5 py-10 text-center text-sm text-neutral-400" colSpan={4}>
-                    No pending orders.
+                    Nothing waiting. Every order has been confirmed.
                   </td>
                 </tr>
               )}
@@ -434,22 +397,21 @@ export function Dashboard() {
       {/* District coverage */}
       <Card className="overflow-x-auto">
         <CardHeader
-          title="District coverage"
+          title="Districts your team works in"
           description={
-            <>
-              {uncoveredDistricts.length} of {summary.districtActivity.length} districts have no assigned employee ·{" "}
-              {gapDistricts.length} assigned but no recent activity
-            </>
+            uncoveredDistricts.length
+              ? `Salespeople cover ${summary.districtActivity.length - uncoveredDistricts.length} of Tamil Nadu's ${summary.districtActivity.length} districts.`
+              : "Every district has a salesperson."
           }
         />
         <table className="w-full text-left text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
             <tr>
               <th className="px-5 py-3 font-medium">District</th>
-              <th className="px-5 py-3 font-medium">Employees</th>
-              <th className="px-5 py-3 font-medium">On Duty</th>
+              <th className="px-5 py-3 font-medium">Salespeople</th>
+              <th className="px-5 py-3 font-medium">On duty now</th>
               <th className="px-5 py-3 font-medium">Orders</th>
-              <th className="px-5 py-3 font-medium">Visits</th>
+              <th className="px-5 py-3 font-medium">Shop visits</th>
             </tr>
           </thead>
           <tbody>
@@ -474,9 +436,9 @@ export function Dashboard() {
 
         {gapDistricts.length > 0 && (
           <div className="border-t border-neutral-200 px-4 py-3 text-xs text-neutral-500">
-            <span className="font-medium text-neutral-700">Coverage gaps: </span>
-            {gapDistricts.map((d) => d.districtName).join(", ")} — have an assigned employee but no orders or visits
-            in this period.
+            <span className="font-medium text-neutral-700">No activity: </span>
+            {gapDistricts.map((d) => d.districtName).join(", ")} have a salesperson but no orders or visits in this
+            period.
           </div>
         )}
       </Card>
@@ -484,10 +446,66 @@ export function Dashboard() {
   );
 }
 
-// recharts v3's PieLabelRenderProps doesn't carry our data fields directly (they're
-// nested under `.payload`), but at runtime the flattened props recharts passes in do
-// include them — this type matches what we actually read off `props` at the call site.
-type PieLabelProps = { category?: string; status?: string; count?: number; percent?: number };
+// A ranked list with a bar per row: easier to read than a pie, and long
+// product names are never cut off.
+function RankList({ rows, total }: { rows: { key: string; label: string; sub?: string; value: number }[]; total: number }) {
+  const max = Math.max(...rows.map((r) => r.value), 1);
+  return (
+    <ol className="space-y-3">
+      {rows.map((r, i) => (
+        <li key={r.key}>
+          <div className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="min-w-0 text-neutral-800">
+              <span className="mr-2 text-neutral-400 tabular-nums">{i + 1}.</span>
+              {r.label}
+              {r.sub ? <span className="ml-2 text-xs text-neutral-500">{r.sub}</span> : null}
+            </span>
+            <span className="shrink-0 font-semibold tabular-nums text-neutral-900">
+              {formatCurrency(Math.round(r.value))}
+              {total > 0 ? <span className="ml-2 w-10 text-xs font-normal text-neutral-500">{Math.round((r.value / total) * 100)}%</span> : null}
+            </span>
+          </div>
+          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-100">
+            <div className="h-full rounded-full bg-brand-600" style={{ width: `${(r.value / max) * 100}%` }} />
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+// One bar split by status, with every status named and counted underneath.
+function StatusBreakdown({ rows }: { rows: { status: string; count: number }[] }) {
+  const sorted = [...rows].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+  const total = sorted.reduce((s, r) => s + r.count, 0);
+  return (
+    <div className="space-y-4">
+      <div className="flex h-3 overflow-hidden rounded-full bg-neutral-100">
+        {sorted.map((r) => (
+          <div key={r.status} style={{ width: `${(r.count / total) * 100}%`, backgroundColor: STATUS_COLOR[r.status] ?? "#737373" }} />
+        ))}
+      </div>
+      <ul className="space-y-2">
+        {sorted.map((r) => (
+          <li key={r.status} className="flex items-center gap-3 text-sm">
+            <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: STATUS_COLOR[r.status] ?? "#737373" }} />
+            <span className="flex-1 text-neutral-800">{STATUS_LABEL[r.status] ?? r.status}</span>
+            <span className="font-semibold tabular-nums text-neutral-900">{r.count}</span>
+            <span className="w-10 text-right text-xs tabular-nums text-neutral-500">{Math.round((r.count / total) * 100)}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// "2026-10-13" as "13 Oct" on the axis and "Tue, 13 Oct" in the tooltip.
+function shortDay(ymd: string) {
+  return new Date(`${ymd}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+function longDay(ymd: string) {
+  return new Date(`${ymd}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+}
 
 function formatCurrency(value: unknown): string {
   return `₹${Number(value).toLocaleString("en-IN")}`;
@@ -502,9 +520,9 @@ function EmptyState({ text }: { text: string }) {
 function ageLabel(createdAt: string): string {
   const ms = Date.now() - new Date(createdAt).getTime();
   const days = Math.floor(ms / (24 * 60 * 60 * 1000));
-  if (days >= 1) return `${days}d ago`;
+  if (days >= 1) return days === 1 ? "1 day" : `${days} days`;
   const hours = Math.max(1, Math.floor(ms / (60 * 60 * 1000)));
-  return `${hours}h ago`;
+  return hours === 1 ? "1 hour" : `${hours} hours`;
 }
 
 // Axis labels in Indian units: ₹8L, ₹75k, ₹1.2Cr.

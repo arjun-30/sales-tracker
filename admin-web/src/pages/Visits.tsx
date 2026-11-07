@@ -274,14 +274,14 @@ export function Visits() {
                               </div>
                             </>
                           ) : (
-                            <span className="text-neutral-400">—</span>
+                            <span className="text-neutral-400">-</span>
                           )}
                         </Td>
                         <Td className="whitespace-nowrap text-[13px]">
                           {v.nextVisitOn ? (
                             new Date(`${v.nextVisitOn.slice(0, 10)}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
                           ) : (
-                            <span className="text-neutral-400">—</span>
+                            <span className="text-neutral-400">-</span>
                           )}
                           {!v.notifyOwner ? <div className="text-xs text-neutral-500">No SMS to owner</div> : null}
                         </Td>

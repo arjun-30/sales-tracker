@@ -266,3 +266,21 @@ describe("end of duty at 9 pm", () => {
     expect(res.body.rows[0]).toMatchObject({ present: 1, half: 1 });
   });
 });
+
+describe("today summary for the home page", () => {
+  it("counts what is waiting on the office, for the admin's plant only", async () => {
+    const store = await prisma.store.create({ data: { ...shop, plantId: f.plantA.id } });
+    await prisma.store.create({ data: { ...shop, name: "Waiting", status: "pending", plantId: f.plantA.id } });
+    await prisma.store.create({ data: { ...shop, name: "Overdue", nextVisitOn: new Date("2020-01-01"), plantId: f.plantA.id } });
+    await prisma.store.create({ data: { ...shop, name: "Other plant", status: "pending", plantId: f.plantB.id } });
+    const o1 = (await order({ storeId: store.id })).body.order;
+    await order({ storeId: store.id });
+    await api().patch(`/api/orders/${o1.id}/status`).set(bearer(adminA)).send({ status: "confirmed" });
+
+    const res = await api().get("/api/reports/today").set(bearer(adminA));
+    expect(res.status).toBe(200);
+    expect(res.body.staff).toMatchObject({ total: 1, onDuty: 1 });
+    expect(res.body.today).toMatchObject({ orders: 2, sales: 2000 });
+    expect(res.body.waiting).toMatchObject({ pendingOrders: 1, toDispatch: 1, shopsWaiting: 1, shopsOverdue: 1 });
+  });
+});

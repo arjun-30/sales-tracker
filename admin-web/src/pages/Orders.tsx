@@ -37,7 +37,11 @@ export function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [districtFilter, setDistrictFilter] = useState("");
-  const [tab, setTab] = useState<TabValue>("all");
+  // The home page links straight to a tab: /orders?tab=pending.
+  const [tab, setTab] = useState<TabValue>(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return t && ["pending", "confirmed", "dispatched", "delivered", "cancelled"].includes(t) ? (t as TabValue) : "all";
+  });
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -203,7 +207,7 @@ export function Orders() {
                       <Td className="max-w-[170px]">
                         <div className="truncate font-medium text-neutral-900">{o.customerName}</div>
                         <div className="truncate text-xs text-neutral-500">
-                          {[o.shopName, o.customerPhone].filter(Boolean).join(" · ") || "—"}
+                          {[o.shopName, o.customerPhone].filter(Boolean).join(" · ") || "-"}
                         </div>
                         <HowTaken order={o} />
                       </Td>
@@ -347,12 +351,12 @@ function OrderDetail({ order, busy, onAction }: { order: Order; busy: boolean; o
           </div>
         ) : null}
         <Detail label="Order ID" value={<span className="font-mono text-xs">{order.id}</span>} />
-        <Detail label="Customer phone" value={order.customerPhone || "—"} />
-        <Detail label="Shop" value={order.shopName || "—"} />
-        <Detail label="GSTIN" value={order.gstin ? <span className="font-mono text-xs">{order.gstin}</span> : "—"} />
+        <Detail label="Customer phone" value={order.customerPhone || "-"} />
+        <Detail label="Shop" value={order.shopName || "-"} />
+        <Detail label="GSTIN" value={order.gstin ? <span className="font-mono text-xs">{order.gstin}</span> : "-"} />
         <Detail label="Supply and delivery" value={<SupplyDetail order={order} />} />
         <Detail label="How it was taken" value={<HowTaken order={order} long />} />
-        <Detail label="Notes" value={order.notes || "—"} />
+        <Detail label="Notes" value={order.notes || "-"} />
         {order.voiceNote ? <Detail label="Voice note" value={<VoiceNote orderId={order.id} />} /> : null}
         <Detail label="Order copy" value={<OrderPdfLink orderId={order.id} />} />
         {order.deliveryProof ? <Detail label="Delivery photo" value={<DeliveryPhoto orderId={order.id} />} /> : null}

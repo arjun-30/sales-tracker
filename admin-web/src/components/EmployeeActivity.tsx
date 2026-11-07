@@ -115,7 +115,7 @@ export function EmployeeActivity({ employeeId, from, to }: { employeeId: string;
                 <Td className="whitespace-nowrap">
                   {v.checkOutAt ? formatDateTime(v.checkOutAt) : <span className="text-neutral-400">Not checked out</span>}
                 </Td>
-                <Td className="max-w-64 truncate text-neutral-600">{v.notes ?? "—"}</Td>
+                <Td className="max-w-64 truncate text-neutral-600">{v.notes ?? "-"}</Td>
               </Tr>
             ))}
           </tbody>
@@ -140,7 +140,7 @@ export function EmployeeActivity({ employeeId, from, to }: { employeeId: string;
                   <div className="font-medium text-neutral-900">{s.name}</div>
                   {s.address ? <div className="text-xs text-neutral-500">{s.address}</div> : null}
                 </Td>
-                <Td className="tabular-nums">{s.phone ?? "—"}</Td>
+                <Td className="tabular-nums">{s.phone ?? "-"}</Td>
                 <Td className="whitespace-nowrap">{formatDateTime(s.createdAt)}</Td>
                 <Td>{s.status === "pending" ? "Waiting for approval" : "Approved"}</Td>
               </Tr>

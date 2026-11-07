@@ -64,7 +64,7 @@ export function Messages() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Messages"
+        title="SMS & WhatsApp"
         description="SMS and WhatsApp sent to shop owners and plant admins after orders, visits and new shops."
       />
 

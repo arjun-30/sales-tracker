@@ -251,7 +251,7 @@ export function StoreImport({ onCancel, onDone }: { onCancel: () => void; onDone
                     <tr key={i} className="border-t border-neutral-100">
                       <td className="px-3 py-2 text-neutral-400">{i + 2}</td>
                       <td className="px-3 py-2 text-neutral-800">{r.name ?? <span className="text-red-600">No name</span>}</td>
-                      <td className="px-3 py-2 tabular-nums text-neutral-600">{r.phone ?? "—"}</td>
+                      <td className="px-3 py-2 tabular-nums text-neutral-600">{r.phone ?? "-"}</td>
                       <td className="max-w-72 truncate px-3 py-2 text-neutral-600">
                         {r.lat !== null && r.lng !== null
                           ? `${r.lat}, ${r.lng}`
@@ -305,7 +305,7 @@ export function StoreImport({ onCancel, onDone }: { onCancel: () => void; onDone
                     {problems.map((r) => (
                       <tr key={r.row} className="border-t border-neutral-100">
                         <td className="px-3 py-2 tabular-nums text-neutral-500">{r.row}</td>
-                        <td className="px-3 py-2 text-neutral-800">{r.name ?? "—"}</td>
+                        <td className="px-3 py-2 text-neutral-800">{r.name ?? "-"}</td>
                         <td className={`px-3 py-2 ${r.status === "error" ? "text-red-700" : "text-neutral-500"}`}>{r.message}</td>
                       </tr>
                     ))}
