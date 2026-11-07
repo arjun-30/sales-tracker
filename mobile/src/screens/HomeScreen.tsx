@@ -53,11 +53,14 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // The plant's shops for the map, and where the salesperson is now.
+  // The map shows as soon as the shops arrive; the position joins it when it comes.
   const loadStores = useCallback(async () => {
-    try {
-      const [s, pos] = await Promise.all([api<{ stores: Store[] }>("/api/stores"), getCurrentPosition()]);
-      setStores(s.stores);
+    getCurrentPosition().then((pos) => {
       if (pos) setMe(pos);
+    });
+    try {
+      const s = await api<{ stores: Store[] }>("/api/stores");
+      setStores(s.stores);
     } catch {
       setStores((prev) => prev ?? []);
     }
@@ -85,11 +88,13 @@ export default function HomeScreen() {
     }
   }, []);
 
+  // Off duty this screen is all the app shows, and it shows no data.
   useFocusEffect(
     useCallback(() => {
+      if (!onDuty) return;
       loadStats();
       loadStores();
-    }, [loadStats, loadStores])
+    }, [onDuty, loadStats, loadStores])
   );
 
   function newOrder() {
@@ -115,14 +120,16 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadStats();
-              loadStores();
-            }}
-          />
+          onDuty ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadStats();
+                loadStores();
+              }}
+            />
+          ) : undefined
         }
       >
         <View style={styles.headerTop}>
@@ -156,11 +163,15 @@ export default function HomeScreen() {
               <View style={[styles.dot, { backgroundColor: colors.textFaint }]} />
               <Text style={styles.dutyTitle}>Off duty</Text>
             </View>
-            <Text style={styles.dutyHint}>Start duty to take orders, log shop visits and record your hours.</Text>
+            <Text style={styles.dutyHint}>
+              Start duty to see your orders, shops and prices, take orders, log shop visits and record your hours.
+            </Text>
             <Button label="Start duty" loading={busy} onPress={toggleDuty} />
           </Card>
         )}
 
+        {onDuty ? (
+        <>
         <View style={styles.section}>
         <SectionLabel>Today</SectionLabel>
         <Card style={styles.stats}>
@@ -187,6 +198,8 @@ export default function HomeScreen() {
           {stores ? <StoreMap stores={stores} me={me} /> : <Card style={styles.mapLoading}><ActivityIndicator color={colors.textMuted} /></Card>}
           <Action icon="add-circle-outline" label="Add the shop I'm in" onPress={() => navigation.navigate("AddStore")} />
         </View>
+        </>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

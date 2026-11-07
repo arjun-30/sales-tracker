@@ -298,6 +298,7 @@ function OrderDetail({ order }: { order: Order }) {
         <Detail label="How it was taken" value={<HowTaken order={order} long />} />
         <Detail label="Notes" value={order.notes || "—"} />
         {order.voiceNote ? <Detail label="Voice note" value={<VoiceNote orderId={order.id} />} /> : null}
+        <Detail label="Order copy" value={<OrderPdfLink orderId={order.id} />} />
       </dl>
     </div>
   );
@@ -354,6 +355,38 @@ function VoiceNote({ orderId }: { orderId: string }) {
       <a href={src} download={`voice-note-${orderId}.m4a`} className="text-xs text-brand-700 hover:underline">
         Download
       </a>
+    </div>
+  );
+}
+
+// The PDF the shop owner gets on WhatsApp, opened in a new tab.
+function OrderPdfLink({ orderId }: { orderId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function open() {
+    // Opened before the download so the browser doesn't block it as a pop-up.
+    const tab = window.open("", "_blank");
+    setBusy(true);
+    setError(null);
+    try {
+      const blob = await apiBlob(`/api/orders/${orderId}/pdf`);
+      const url = URL.createObjectURL(blob);
+      if (tab) tab.location.href = url;
+      else window.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      tab?.close();
+      setError(e instanceof Error ? e.message : "Couldn't open the PDF");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div>
+      <button type="button" onClick={open} disabled={busy} className="text-sm text-brand-700 hover:underline disabled:opacity-50">
+        {busy ? "Opening…" : "Open PDF"}
+      </button>
+      {error ? <div className="text-xs text-red-600">{error}</div> : null}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Attendance } from "./pages/Attendance";
 import { Stores } from "./pages/Stores";
 import { Plants } from "./pages/Plants";
+import { Messages } from "./pages/Messages";
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
         <Route path="attendance" element={<Attendance />} />
         <Route path="stores" element={<Stores />} />
         <Route path="plants" element={<Plants />} />
+        <Route path="messages" element={<Messages />} />
       </Route>
     </Routes>
   );

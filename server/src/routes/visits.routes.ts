@@ -3,13 +3,18 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { plantFilter } from "../lib/scope";
+import { inBackground } from "../lib/messaging";
+import { notifyVisitEnded } from "../lib/notify";
 
 export const visitsRouter = Router();
 
 visitsRouter.use(requireAuth);
 
+// A shop on the plant's map (storeId), whose owner hears how the visit went,
+// or one typed by name (older app builds).
 const checkInSchema = z.object({
-  shopName: z.string().min(1),
+  storeId: z.string().min(1).optional(),
+  shopName: z.string().min(1).optional(),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   notes: z.string().optional(),
@@ -44,12 +49,24 @@ visitsRouter.post("/checkin", requireRole("sales_employee"), async (req, res) =>
     return res.status(409).json({ error: "Go on duty before checking in to a shop." });
   }
 
-  const { shopName, lat, lng, notes } = parsed.data;
+  const { storeId, lat, lng, notes } = parsed.data;
+  // A shop of the salesperson's plant: approved, or one they added themselves.
+  const store = storeId
+    ? await prisma.store.findFirst({
+        where: { id: storeId, plantId: employee.plantId, OR: [{ status: "approved" }, { createdById: employeeId }] },
+        select: { id: true, name: true },
+      })
+    : null;
+  if (storeId && !store) return res.status(400).json({ error: "That shop is not on your plant's map" });
+  const shopName = store?.name ?? parsed.data.shopName?.trim();
+  if (!shopName) return res.status(400).json({ error: "Pick the shop you are visiting" });
+
   const visit = await prisma.visit.create({
     data: {
       employeeId,
       districtId: employee.districtId,
       plantId: employee.plantId,
+      storeId: store?.id,
       shopName,
       checkInLat: lat,
       checkInLng: lng,
@@ -84,6 +101,8 @@ visitsRouter.post("/:id/checkout", requireRole("sales_employee"), async (req, re
   });
 
   res.json({ visit: updated });
+  // No order at the shop during the visit: the owner and the admins hear so.
+  inBackground(() => notifyVisitEnded(updated.id));
 });
 
 const listQuerySchema = z.object({

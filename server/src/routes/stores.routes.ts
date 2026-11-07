@@ -6,6 +6,7 @@ import { plantFilter, targetPlantId } from "../lib/scope";
 import { LocationNotFoundError, resolveLocation } from "../lib/mapsLink";
 import { distanceM } from "../lib/geo";
 import { emitToAdmins } from "../socket";
+import { RESEND_AFTER_MS, sendShopCode, useShopCode } from "../lib/phoneOtp";
 
 // Shops and dealers each plant supplies, shown on the admin map.
 export const storesRouter = Router();
@@ -92,16 +93,48 @@ storesRouter.post("/", requireAdmin, async (req, res) => {
   res.status(201).json({ store });
 });
 
-// A salesperson standing in a shop adds it at their phone's position. It
-// waits for a plant admin to approve it before the rest of the team sees it.
+const mobile = z
+  .string({ required_error: "Enter the owner's mobile number" })
+  .trim()
+  .regex(/^\d{10}$/,"Phone number must be exactly 10 digits");
+
+const phoneCodeSchema = z.object({ phone: mobile, shopName: z.string().trim().min(1, "Enter the shop name").max(200) });
+
+// Step one of adding a shop from the field: an SMS code to the owner's mobile.
+storesRouter.post("/phone-code", requireRole("sales_employee"), async (req, res) => {
+  const parsed = phoneCodeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid number" });
+  }
+  if (!req.user!.plantId) return res.status(400).json({ error: "Your account is not linked to a plant" });
+  const { devCode } = await sendShopCode({
+    userId: req.user!.sub,
+    employeeName: req.user!.name,
+    phone: parsed.data.phone,
+    shopName: parsed.data.shopName,
+    plantId: req.user!.plantId,
+  });
+  res.json({ sent: true, resendInSeconds: RESEND_AFTER_MS / 1000, ...(devCode ? { devCode } : {}) });
+});
+
+const fieldStoreSchema = storeSchema.omit({ plantId: true }).extend({
+  phone: mobile,
+  code: z.string({ required_error: "Enter the code the owner received" }).trim().min(1, "Enter the code the owner received"),
+});
+
+// A salesperson standing in a shop adds it at their phone's position, with the
+// SMS code the owner received. It waits for a plant admin to approve it before
+// the rest of the team sees it.
 storesRouter.post("/from-field", requireRole("sales_employee"), async (req, res) => {
-  const parsed = storeSchema.omit({ plantId: true }).safeParse(req.body);
+  const parsed = fieldStoreSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid shop details" });
   }
   if (!req.user!.plantId) return res.status(400).json({ error: "Your account is not linked to a plant" });
+  const { code, ...data } = parsed.data;
+  await useShopCode(req.user!.sub, data.phone, code);
   const store = await prisma.store.create({
-    data: { ...parsed.data, plantId: req.user!.plantId, status: "pending", createdById: req.user!.sub },
+    data: { ...data, phoneVerifiedAt: new Date(), plantId: req.user!.plantId, status: "pending", createdById: req.user!.sub },
     include: storeInclude,
   });
   emitToAdmins(store.plantId, "store:pending", { storeId: store.id, name: store.name, addedBy: store.createdBy?.name });

@@ -13,6 +13,8 @@ import { colors } from "../theme";
 
 interface DutyContextValue {
   onDuty: boolean;
+  // False until the duty state has been read once after the app opens.
+  ready: boolean;
   busy: boolean;
   // Asks for the employee code, then starts or ends duty.
   toggleDuty: () => void;
@@ -22,6 +24,7 @@ const DutyContext = createContext<DutyContextValue | undefined>(undefined);
 
 export function DutyProvider({ children }: { children: React.ReactNode }) {
   const [onDuty, setOnDuty] = useState(false);
+  const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [code, setCode] = useState("");
@@ -33,6 +36,7 @@ export function DutyProvider({ children }: { children: React.ReactNode }) {
     const sync = () =>
       isBackgroundLocationRunning().then((running) => {
         setOnDuty(running);
+        setReady(true);
         setBusy(false);
       });
     sync();
@@ -93,7 +97,7 @@ export function DutyProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const value = useMemo(() => ({ onDuty, busy, toggleDuty }), [onDuty, busy, toggleDuty]);
+  const value = useMemo(() => ({ onDuty, ready, busy, toggleDuty }), [onDuty, ready, busy, toggleDuty]);
 
   return (
     <DutyContext.Provider value={value}>

@@ -22,7 +22,7 @@ export const PASSWORD = "secret123";
 export async function resetDb() {
   await prisma.$executeRawUnsafe(`
     TRUNCATE "OrderItem", "Order", "Visit", "LocationHistory", "EmployeeLocation", "DutySession",
-             "Store", "PlantPrice", "ProductVariant", "Product", "User", "Plant", "District" CASCADE
+             "Store", "PhoneOtp", "OutboundMessage", "PlantPrice", "ProductVariant", "Product", "User", "Plant", "District" CASCADE
   `);
 }
 

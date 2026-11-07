@@ -7,6 +7,9 @@ import { requireAdmin, requireAuth, requireRole } from "../middleware/auth";
 import { plantPriceMap } from "../lib/prices";
 import { plantFilter } from "../lib/scope";
 import { distanceM } from "../lib/geo";
+import { inBackground } from "../lib/messaging";
+import { notifyOrderTaken } from "../lib/notify";
+import { loadOrderForPdf, orderPdf, orderRef } from "../lib/orderPdf";
 
 export const ordersRouter = Router();
 
@@ -208,6 +211,19 @@ ordersRouter.post("/", requireRole("sales_employee"), voiceUpload.single("voiceN
   });
 
   res.status(201).json({ order });
+  // SMS to the owner and the plant admins, and the order copy on WhatsApp.
+  inBackground(() => notifyOrderTaken(order.id));
+});
+
+// The order copy as a PDF, the same one the shop owner gets on WhatsApp.
+ordersRouter.get("/:id/pdf", async (req, res) => {
+  const visible = await findVisibleOrder(req, req.params.id);
+  const order = visible && (await loadOrderForPdf(visible.id));
+  if (!order) return res.status(404).json({ error: "Order not found" });
+  const pdf = await orderPdf(order);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="Roalux-order-${orderRef(order.id)}.pdf"`);
+  res.send(pdf);
 });
 
 // The order's voice note as audio, for the office (or the salesperson who

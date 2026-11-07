@@ -7,7 +7,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
-import { DutyProvider } from "../context/DutyContext";
+import { DutyProvider, useDuty } from "../context/DutyContext";
 import LoginScreen from "../screens/LoginScreen";
 import HomeScreen from "../screens/HomeScreen";
 import OrdersScreen from "../screens/OrdersScreen";
@@ -72,16 +72,41 @@ function Tabs() {
   );
 }
 
+function Loading() {
+  return (
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
+}
+
+// Off duty the app shows nothing but the way back on duty (and Profile, to log
+// out or change the server): no orders, visits, shops or prices.
+function SignedIn() {
+  const { onDuty, ready } = useDuty();
+  if (!ready) return <Loading />;
+  // Keyed by duty so going on or off duty starts again from that mode's first
+  // screen, instead of leaving Profile open with nothing behind it.
+  return (
+    <Stack.Navigator key={onDuty ? "on-duty" : "off-duty"} screenOptions={headerStyle}>
+      {onDuty ? (
+        <>
+          <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
+          <Stack.Screen name="NewOrder" component={NewOrderScreen} options={{ title: "New Order" }} />
+          <Stack.Screen name="AddStore" component={AddStoreScreen} options={{ title: "Add a shop" }} />
+        </>
+      ) : (
+        <Stack.Screen name="OffDuty" component={HomeScreen} options={{ headerShown: false }} />
+      )}
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
+    </Stack.Navigator>
+  );
+}
+
 export default function RootNavigator() {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  if (loading) return <Loading />;
 
   return (
     <NavigationContainer theme={navTheme}>
@@ -89,12 +114,7 @@ export default function RootNavigator() {
       <StatusBar style="dark" />
       {user ? (
         <DutyProvider>
-          <Stack.Navigator screenOptions={headerStyle}>
-            <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-            <Stack.Screen name="NewOrder" component={NewOrderScreen} options={{ title: "New Order" }} />
-            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
-            <Stack.Screen name="AddStore" component={AddStoreScreen} options={{ title: "Add a shop" }} />
-          </Stack.Navigator>
+          <SignedIn />
         </DutyProvider>
       ) : (
         <LoginScreen />

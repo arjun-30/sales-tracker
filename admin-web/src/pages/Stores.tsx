@@ -10,6 +10,9 @@ import { Button } from "../components/ui/Button";
 import { Input, Label, Select } from "../components/ui/Input";
 import { MessageRow, Table, Td, Th, Tr } from "../components/ui/Table";
 import { StoreImport } from "../components/StoreImport";
+import { STORES_CHANGED } from "../components/Layout";
+
+const storesChanged = () => window.dispatchEvent(new Event(STORES_CHANGED));
 
 const TAMIL_NADU_CENTER = { lat: 10.8284, lng: 78.7638 };
 
@@ -229,7 +232,10 @@ export function Stores() {
   function refresh() {
     setLoading(true);
     api<{ stores: Store[] }>("/api/stores")
-      .then((d) => setStores(d.stores))
+      .then((d) => {
+        setStores(d.stores);
+        storesChanged();
+      })
       .finally(() => setLoading(false));
   }
 
@@ -255,6 +261,7 @@ export function Stores() {
     try {
       await api(`/api/stores/${store.id}/approve`, { method: "POST" });
       setStores((prev) => prev.map((s) => (s.id === store.id ? { ...s, status: "approved" } : s)));
+      storesChanged();
       setNotice({ tone: "ok", text: `${store.name} approved. The whole team sees it on the map now.` });
     } catch (err) {
       setNotice({ tone: "error", text: err instanceof Error ? err.message : "Could not approve the store" });
@@ -268,6 +275,7 @@ export function Stores() {
     try {
       await api(`/api/stores/${store.id}`, { method: "DELETE" });
       setStores((prev) => prev.filter((s) => s.id !== store.id));
+      storesChanged();
       setNotice({ tone: "ok", text: `${store.name} removed.` });
     } catch (err) {
       setNotice({ tone: "error", text: err instanceof Error ? err.message : "Could not remove the store" });
@@ -337,7 +345,14 @@ export function Stores() {
                     <div className="font-medium text-neutral-900">{s.name}</div>
                     {s.ownerName ? <div className="text-xs text-neutral-500">{s.ownerName}</div> : null}
                   </Td>
-                  <Td className="tabular-nums">{s.phone ?? <span className="text-neutral-400">—</span>}</Td>
+                  <Td className="tabular-nums">
+                    {s.phone ?? <span className="text-neutral-400">—</span>}
+                    {s.phoneVerifiedAt ? (
+                      <div className="text-xs text-emerald-700" title="The owner received the SMS code and read it back">
+                        Checked by SMS code
+                      </div>
+                    ) : null}
+                  </Td>
                   <Td className="max-w-72">
                     <div className="truncate">{s.address ?? <span className="text-neutral-400">—</span>}</div>
                     <a
@@ -428,7 +443,14 @@ export function Stores() {
                     <div className="font-medium text-neutral-900">{s.name}</div>
                     {s.ownerName ? <div className="text-xs text-neutral-500">{s.ownerName}</div> : null}
                   </Td>
-                  <Td className="tabular-nums">{s.phone ?? <span className="text-neutral-400">—</span>}</Td>
+                  <Td className="tabular-nums">
+                    {s.phone ?? <span className="text-neutral-400">—</span>}
+                    {s.phoneVerifiedAt ? (
+                      <div className="text-xs text-emerald-700" title="The owner received the SMS code and read it back">
+                        Checked by SMS code
+                      </div>
+                    ) : null}
+                  </Td>
                   <Td className="max-w-72">
                     <div className="truncate">{s.address ?? <span className="text-neutral-400">—</span>}</div>
                     <a

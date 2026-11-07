@@ -77,10 +77,16 @@ export async function stopBackgroundLocationUpdates(): Promise<void> {
   }
 }
 
+// Indoors a fresh fix can take minutes or never come, so after a few seconds
+// fall back to the phone's last known position rather than keep the screen waiting.
+const FIX_TIMEOUT_MS = 8000;
+
 export async function getCurrentPosition(): Promise<{ lat: number; lng: number } | null> {
   try {
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    const fresh = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), FIX_TIMEOUT_MS));
+    const pos = (await Promise.race([fresh, timeout])) ?? (await Location.getLastKnownPositionAsync());
+    return pos ? { lat: pos.coords.latitude, lng: pos.coords.longitude } : null;
   } catch {
     return null;
   }

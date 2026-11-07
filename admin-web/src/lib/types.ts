@@ -35,6 +35,8 @@ export interface Store {
   notes: string | null;
   // A shop a salesperson added from the field waits for approval.
   status: "pending" | "approved";
+  // When the owner read back the SMS code sent to the number.
+  phoneVerifiedAt: string | null;
   createdAt: string;
   plant: PlantRef;
   createdBy: { id: string; name: string } | null;

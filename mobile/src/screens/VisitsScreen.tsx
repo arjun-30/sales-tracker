@@ -1,15 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api } from "../lib/api";
 import { getCurrentPosition } from "../lib/locationTask";
+import { distanceKm, formatKm, type LatLng } from "../lib/geo";
 import { useDuty } from "../context/DutyContext";
-import type { Visit } from "../lib/types";
+import type { Store, Visit } from "../lib/types";
+import type { RootStackParamList } from "../navigation/types";
 import { Button, Card, EmptyState, Field, Loading, SectionLabel } from "../components/ui";
 import { colors, formatDuration, formatTime } from "../theme";
 
-const RECENT_SHOPS = 3;
+// Shops listed to pick from: the nearest, or the best matches for a search.
+const SHOPS_SHOWN = 5;
 
 function minutesBetween(from: string, to: string | null) {
   return Math.max(0, ((to ? new Date(to).getTime() : Date.now()) - new Date(from).getTime()) / 60000);
@@ -32,11 +36,16 @@ function dayLabel(iso: string) {
 }
 
 export default function VisitsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { onDuty, busy: dutyBusy, toggleDuty } = useDuty();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [shopName, setShopName] = useState("");
+  // Visits are to shops on the plant's map, so the owner can be told how it went.
+  const [stores, setStores] = useState<Store[]>([]);
+  const [me, setMe] = useState<LatLng | null>(null);
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<Store | null>(null);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [, setTick] = useState(0);
@@ -51,10 +60,23 @@ export default function VisitsScreen() {
     }
   }, []);
 
+  const loadStores = useCallback(async () => {
+    getCurrentPosition().then((pos) => {
+      if (pos) setMe(pos);
+    });
+    try {
+      const data = await api<{ stores: Store[] }>("/api/stores");
+      setStores(data.stores);
+    } catch {
+      // The list stays as it was; check-in still works once it loads.
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+      loadStores();
+    }, [load, loadStores])
   );
 
   const openVisit = visits.find((v) => !v.checkOutAt);
@@ -68,20 +90,15 @@ export default function VisitsScreen() {
 
   const history = useMemo(() => visits.filter((v) => v.checkOutAt), [visits]);
 
-  // Shops this salesperson keeps going back to, for one-tap check-in.
-  const recentShops = useMemo(() => {
-    const seen = new Set<string>();
-    const names: string[] = [];
-    for (const v of history) {
-      const key = v.shopName.trim().toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        names.push(v.shopName.trim());
-      }
-      if (names.length === RECENT_SHOPS) break;
-    }
-    return names;
-  }, [history]);
+  // The nearest shops, or those matching the search, nearest first.
+  const shopChoices = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return stores
+      .filter((s) => !q || s.name.toLowerCase().includes(q))
+      .map((s) => ({ store: s, km: me ? distanceKm(me, s) : null }))
+      .sort((a, b) => (a.km ?? 0) - (b.km ?? 0) || a.store.name.localeCompare(b.store.name))
+      .slice(0, SHOPS_SHOWN);
+  }, [stores, me, query]);
 
   const days = useMemo(() => {
     const groups: { label: string; visits: Visit[]; minutes: number }[] = [];
@@ -99,8 +116,8 @@ export default function VisitsScreen() {
   }, [history]);
 
   async function handleCheckIn() {
-    if (!shopName.trim()) {
-      Alert.alert("Shop name needed", "Enter the name of the shop you're visiting.");
+    if (!picked) {
+      Alert.alert("Pick the shop", "Choose the shop you're visiting from the list.");
       return;
     }
     setSubmitting(true);
@@ -112,9 +129,10 @@ export default function VisitsScreen() {
       }
       await api("/api/visits/checkin", {
         method: "POST",
-        body: JSON.stringify({ shopName: shopName.trim(), notes: notes.trim() || undefined, ...pos }),
+        body: JSON.stringify({ storeId: picked.id, notes: notes.trim() || undefined, ...pos }),
       });
-      setShopName("");
+      setPicked(null);
+      setQuery("");
       setNotes("");
       await load();
     } catch (err) {
@@ -184,32 +202,50 @@ export default function VisitsScreen() {
       ) : (
         <Card style={styles.card}>
           <Text style={styles.cardTitle}>Check in to a shop</Text>
-          <Text style={styles.meta}>Your current location is saved with the visit.</Text>
-          <Field
-            label="Shop name"
-            icon="storefront-outline"
-            placeholder="e.g. Sri Murugan Paints"
-            value={shopName}
-            onChangeText={setShopName}
-          />
-          {recentShops.length > 0 && !shopName ? (
-            <View style={styles.recent}>
-              <Text style={styles.recentLabel}>Recent shops</Text>
-              {recentShops.map((name, i) => (
-                <TouchableOpacity
-                  key={name}
-                  style={[styles.recentShop, i > 0 && styles.recentShopBorder]}
-                  onPress={() => setShopName(name)}
-                >
-                  <Ionicons name="time-outline" size={16} color={colors.textMuted} />
-                  <Text style={styles.recentShopText} numberOfLines={1}>
-                    {name}
-                  </Text>
-                  <Ionicons name="arrow-up-outline" size={15} color={colors.textFaint} style={{ transform: [{ rotate: "-45deg" }] }} />
-                </TouchableOpacity>
-              ))}
+          <Text style={styles.meta}>Your location is saved with the visit. The shop owner gets an SMS about the visit.</Text>
+          {picked ? (
+            <View style={styles.picked}>
+              <Ionicons name="storefront" size={18} color={colors.text} />
+              <Text style={styles.pickedName} numberOfLines={1}>
+                {picked.name}
+              </Text>
+              <TouchableOpacity onPress={() => setPicked(null)} hitSlop={10} accessibilityLabel="Pick another shop">
+                <Text style={styles.link}>Change</Text>
+              </TouchableOpacity>
             </View>
-          ) : null}
+          ) : (
+            <>
+              <Field
+                label="Shop"
+                icon="search-outline"
+                placeholder="Search the shops on your map"
+                value={query}
+                onChangeText={setQuery}
+                autoCorrect={false}
+              />
+              <View style={styles.recent}>
+                <Text style={styles.recentLabel}>{query.trim() ? "Matching shops" : me ? "Nearest shops" : "Shops"}</Text>
+                {shopChoices.map(({ store, km }, i) => (
+                  <TouchableOpacity
+                    key={store.id}
+                    style={[styles.recentShop, i > 0 && styles.recentShopBorder]}
+                    onPress={() => setPicked(store)}
+                  >
+                    <Ionicons name="storefront-outline" size={16} color={colors.textMuted} />
+                    <Text style={styles.recentShopText} numberOfLines={1}>
+                      {store.name}
+                    </Text>
+                    {km !== null ? <Text style={styles.km}>{formatKm(km)}</Text> : null}
+                  </TouchableOpacity>
+                ))}
+                {shopChoices.length === 0 ? <Text style={styles.empty}>No shop by that name on your map.</Text> : null}
+                <TouchableOpacity style={[styles.recentShop, styles.recentShopBorder]} onPress={() => navigation.navigate("AddStore")}>
+                  <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+                  <Text style={[styles.recentShopText, { color: colors.primary }]}>Not on the map? Add the shop</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
           <Field
             label="Notes (optional)"
             icon="create-outline"
@@ -217,7 +253,7 @@ export default function VisitsScreen() {
             value={notes}
             onChangeText={setNotes}
           />
-          <Button label="Check in" icon="location-outline" onPress={handleCheckIn} loading={submitting} />
+          <Button label="Check in" icon="location-outline" onPress={handleCheckIn} loading={submitting} disabled={!picked} />
         </Card>
       )}
 
@@ -274,6 +310,20 @@ const styles = StyleSheet.create({
   recentShop: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
   recentShopBorder: { borderTopWidth: 1, borderTopColor: colors.border },
   recentShopText: { flex: 1, fontSize: 15, color: colors.text },
+  km: { fontSize: 13, color: colors.textMuted, fontVariant: ["tabular-nums"] },
+  empty: { fontSize: 14, color: colors.textMuted, paddingVertical: 10 },
+  picked: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+  },
+  pickedName: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.text },
+  link: { fontSize: 14, fontWeight: "600", color: colors.primary },
   day: { gap: 8 },
   dayHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
   daySummary: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },

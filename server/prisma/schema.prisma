@@ -86,23 +86,26 @@ model PlantPrice {
 
 // A shop or dealer the plant supplies, pinned on the admin map.
 model Store {
-  id          String      @id @default(cuid())
-  plantId     String
-  name        String
-  ownerName   String?
-  phone       String?
-  address     String?
-  lat         Float
-  lng         Float
-  notes       String?
-  status      StoreStatus @default(approved)
-  createdById String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  plantId         String
+  name            String
+  ownerName       String?
+  phone           String?
+  address         String?
+  lat             Float
+  lng             Float
+  notes           String?
+  status          StoreStatus @default(approved)
+  // When the owner read back the SMS code sent to phone, proving it is theirs.
+  phoneVerifiedAt DateTime?
+  createdById     String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   plant     Plant   @relation(fields: [plantId], references: [id])
   createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
   orders    Order[]
+  visits    Visit[]
 
   @@index([plantId])
 }
@@ -286,11 +289,63 @@ model Visit {
   checkOutLat Float?
   checkOutLng Float?
   notes       String?
+  // The shop on the map, when the visit was checked in to one: its owner is
+  // told how the visit went.
+  storeId     String?
 
   employee User     @relation(fields: [employeeId], references: [id])
   district District @relation(fields: [districtId], references: [id])
   plant    Plant    @relation(fields: [plantId], references: [id])
+  store    Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
 
   @@index([employeeId, checkInAt])
   @@index([plantId, checkInAt])
+}
+
+// A one-time code sent by SMS to a shop owner's number, which the salesperson
+// types in to show the number is real before the shop goes to the office.
+model PhoneOtp {
+  id         String    @id @default(cuid())
+  phone      String
+  codeHash   String
+  // The salesperson who asked for it; only they can use it.
+  userId     String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, userId, createdAt])
+}
+
+enum MessageChannel {
+  sms
+  whatsapp
+}
+
+enum MessageStatus {
+  sent
+  failed
+  // No provider set up: written here (and to the console) instead of sent.
+  logged
+}
+
+// Every SMS and WhatsApp message the system sends, for the office to check.
+model OutboundMessage {
+  id          String         @id @default(cuid())
+  channel     MessageChannel
+  kind        String
+  to          String
+  body        String
+  status      MessageStatus
+  provider    String
+  providerRef String?
+  error       String?
+  plantId     String?
+  orderId     String?
+  visitId     String?
+  createdAt   DateTime       @default(now())
+
+  @@index([plantId, createdAt])
+  @@index([kind, createdAt])
 }

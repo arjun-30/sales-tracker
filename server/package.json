@@ -26,6 +26,7 @@
     "express-rate-limit": "^8.7.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.4.0",
+    "pdfkit": "^0.15.2",
     "socket.io": "^4.8.0",
     "zod": "^3.23.8"
   },
@@ -36,6 +37,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^2.3.0",
     "@types/node": "^22.7.4",
+    "@types/pdfkit": "^0.13.9",
     "@types/supertest": "^7.2.1",
     "prisma": "^5.20.0",
     "supertest": "^7.3.0",

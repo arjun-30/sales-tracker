@@ -45,6 +45,23 @@ export default function AddStoreScreen() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  // The SMS code that proves the mobile number is the owner's.
+  const [codeSentTo, setCodeSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [resendAt, setResendAt] = useState(0);
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  // Counts down to when another code may be sent.
+  useEffect(() => {
+    if (resendAt <= Date.now()) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [resendAt]);
+  const resendIn = Math.max(0, Math.ceil((resendAt - now) / 1000));
+  // Changing the number after sending means a new code is needed.
+  const codeSent = codeSentTo !== null && codeSentTo === phone;
 
   const locate = useCallback(async () => {
     setLocating(true);
@@ -81,6 +98,33 @@ export default function AddStoreScreen() {
     [fix, stores]
   );
 
+  async function sendCode() {
+    if (!name.trim()) {
+      Alert.alert("Shop name needed", "Enter the shop name first. It goes in the owner's SMS.");
+      return;
+    }
+    if (phone.length !== 10) {
+      Alert.alert("Check the phone number", "Enter the owner's 10-digit mobile number.");
+      return;
+    }
+    setSendingCode(true);
+    try {
+      const res = await api<{ resendInSeconds: number; devCode?: string }>("/api/stores/phone-code", {
+        method: "POST",
+        body: JSON.stringify({ phone, shopName: name.trim() }),
+      });
+      setCodeSentTo(phone);
+      setCode("");
+      setDevCode(res.devCode ?? null);
+      setResendAt(Date.now() + res.resendInSeconds * 1000);
+      setNow(Date.now());
+    } catch (err) {
+      Alert.alert("Couldn't send the code", err instanceof Error ? err.message : "Please try again.");
+    } finally {
+      setSendingCode(false);
+    }
+  }
+
   async function save() {
     if (!fix) {
       Alert.alert("No position yet", "Wait for your location, then save.");
@@ -90,8 +134,8 @@ export default function AddStoreScreen() {
       Alert.alert("Shop name needed", "Enter the name on the shop's board.");
       return;
     }
-    if (phone && phone.length !== 10) {
-      Alert.alert("Check the phone number", "Enter the 10-digit mobile number, or leave it empty.");
+    if (!codeSent || code.length !== 6) {
+      Alert.alert("Code needed", "Send the code to the owner's mobile, then type the 6 digits they received.");
       return;
     }
     setSaving(true);
@@ -101,7 +145,8 @@ export default function AddStoreScreen() {
         body: JSON.stringify({
           name: name.trim(),
           ownerName: ownerName.trim() || null,
-          phone: phone || null,
+          phone,
+          code,
           address: address.trim() || null,
           notes: notes.trim() || null,
           lat: fix.lat,
@@ -172,19 +217,53 @@ export default function AddStoreScreen() {
             <Field label="Shop name" placeholder="As on the board, e.g. Sri Murugan Paints" value={name} onChangeText={setName} />
             <Field label="Owner (optional)" placeholder="Who runs the shop" value={ownerName} onChangeText={setOwnerName} />
             <Field
-              label="Mobile number (optional)"
+              label="Owner's mobile number"
               placeholder="98765 43210"
               keyboardType="number-pad"
               maxLength={10}
               value={phone}
               onChangeText={(t) => setPhone(t.replace(/\D/g, ""))}
             />
+            <View style={styles.codeRow}>
+              <Text style={styles.codeHint}>
+                {codeSent
+                  ? `Code sent by SMS to ${phone}. Ask the owner to read it out.`
+                  : "An SMS code goes to this number. The owner reads it out to you."}
+              </Text>
+              <Button
+                label={codeSent ? (resendIn > 0 ? `Again in ${resendIn}s` : "Send again") : "Send code"}
+                variant="secondary"
+                onPress={sendCode}
+                loading={sendingCode}
+                disabled={phone.length !== 10 || (codeSent && resendIn > 0)}
+                style={styles.codeButton}
+              />
+            </View>
+            {codeSent ? (
+              <Field
+                label="Code from the owner's SMS"
+                placeholder="6 digits"
+                keyboardType="number-pad"
+                maxLength={6}
+                value={code}
+                onChangeText={(t) => setCode(t.replace(/\D/g, ""))}
+              />
+            ) : null}
+            {codeSent && devCode ? (
+              <Text style={styles.devCode}>SMS is not set up on this server yet. Demo code: {devCode}</Text>
+            ) : null}
             <Field label="Address (optional)" placeholder="Street, area, town" value={address} onChangeText={setAddress} />
             <Field label="Notes (optional)" placeholder="Landmark, best time to visit…" value={notes} onChangeText={setNotes} />
           </Card>
         </ScrollView>
         <View style={styles.footer}>
-          <Button label="Send to office" icon="checkmark" onPress={save} loading={saving} disabled={!fix || !name.trim()} />
+          <Button
+            label="Send to office"
+            icon="checkmark"
+            onPress={save}
+            loading={saving}
+            disabled={!fix || !name.trim() || !codeSent || code.length !== 6}
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -205,6 +284,10 @@ const styles = StyleSheet.create({
   warnTitle: { fontSize: 14, fontWeight: "700", color: colors.warning },
   warnLine: { fontSize: 14, color: colors.text },
   form: { gap: 14, padding: 18 },
+  codeRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: -4 },
+  codeHint: { flex: 1, fontSize: 13, color: colors.textMuted, lineHeight: 18 },
+  codeButton: { minWidth: 124 },
+  devCode: { fontSize: 13, color: colors.warning, fontWeight: "600" },
   footer: {
     backgroundColor: colors.surface,
     borderTopWidth: 1,

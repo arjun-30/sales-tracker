@@ -23,12 +23,18 @@ beforeEach(async () => {
 afterAll(() => prisma.$disconnect());
 
 const shop = { name: "Sri Murugan Paints", ownerName: "Murugan", phone: "9876543210", lat: 13.05, lng: 80.21 };
+// Adding a shop from the field: an SMS code to the owner's number first. With
+// no SMS provider in tests, the code comes back in the response.
+async function addFromField(token: string, body: Record<string, unknown> = shop) {
+  const sent = await api().post("/api/stores/phone-code").set(bearer(token)).send({ phone: body.phone, shopName: body.name || "X" });
+  return api().post("/api/stores/from-field").set(bearer(token)).send({ ...body, code: sent.body.devCode });
+}
 const storeNames = async (token: string) =>
   ((await api().get("/api/stores").set(bearer(token))).body.stores as { name: string }[]).map((s) => s.name);
 
 describe("shops added from the field", () => {
   it("wait for their plant admin's approval before the rest of the team sees them", async () => {
-    const added = await api().post("/api/stores/from-field").set(bearer(empA)).send(shop);
+    const added = await addFromField(empA);
     expect(added.status).toBe(201);
     expect(added.body.store).toMatchObject({ status: "pending", plantId: f.plantA.id, createdBy: { id: f.empA.id } });
 
@@ -46,13 +52,13 @@ describe("shops added from the field", () => {
 
   it("a pending shop of someone else is hidden from salespeople", async () => {
     await prisma.user.update({ where: { id: f.empB.id }, data: { plantId: f.plantA.id } });
-    await api().post("/api/stores/from-field").set(bearer(empA)).send(shop);
+    await addFromField(empA);
     expect(await storeNames(empB)).toEqual([]);
   });
 
   it("needs a name and a position", async () => {
-    expect((await api().post("/api/stores/from-field").set(bearer(empA)).send({ ...shop, name: "" })).status).toBe(400);
-    expect((await api().post("/api/stores/from-field").set(bearer(empA)).send({ name: "X" })).status).toBe(400);
+    expect((await addFromField(empA, { ...shop, name: "" })).status).toBe(400);
+    expect((await addFromField(empA, { name: "X", phone: shop.phone })).status).toBe(400);
   });
 });
 

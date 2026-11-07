@@ -11,12 +11,14 @@ import {
 } from "react-native";
 import { Ionicons } from "@react-native-vector-icons/ionicons";
 import { useFocusEffect } from "@react-navigation/native";
+import { allowScreenCaptureAsync, preventScreenCaptureAsync } from "expo-screen-capture";
 import { api } from "../lib/api";
 import type { Product } from "../lib/types";
 import { EmptyState, Loading } from "../components/ui";
 import { colors, displayProductName, formatINR, radius } from "../theme";
 
 const ALL = "All";
+const CAPTURE_KEY = "price-list";
 
 export default function CatalogScreen() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -44,6 +46,17 @@ export default function CatalogScreen() {
     useCallback(() => {
       load();
     }, [load])
+  );
+
+  // Prices stay inside the company: no screenshots or screen recording while
+  // this screen is open. Tabs stay mounted, so it is tied to focus, not mount.
+  useFocusEffect(
+    useCallback(() => {
+      preventScreenCaptureAsync(CAPTURE_KEY).catch(() => {});
+      return () => {
+        allowScreenCaptureAsync(CAPTURE_KEY).catch(() => {});
+      };
+    }, [])
   );
 
   const categories = useMemo(

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   BarChart3,
@@ -7,6 +7,7 @@ import {
   Factory,
   LogOut,
   MapPinned,
+  MessageSquare,
   Menu,
   Package,
   Receipt,
@@ -17,6 +18,29 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { usePlant } from "../context/PlantContext";
+import { api } from "../lib/api";
+
+// Fired by the Stores page after an approve or reject, so the count updates at once.
+export const STORES_CHANGED = "stores:changed";
+
+// Shops salespeople added from the field that still need an admin's approval.
+function usePendingStores(plantId: string, pathname: string) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const load = () =>
+      api<{ stores: { status: string }[] }>("/api/stores")
+        .then((d) => setCount(d.stores.filter((s) => s.status === "pending").length))
+        .catch(() => {});
+    load();
+    const timer = setInterval(load, 60_000);
+    window.addEventListener(STORES_CHANGED, load);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(STORES_CHANGED, load);
+    };
+  }, [plantId, pathname]);
+  return count;
+}
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; superOnly?: boolean };
 
@@ -35,6 +59,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { to: "/visits", label: "Shop Visits", icon: Store },
       { to: "/stores", label: "Stores", icon: Building2 },
       { to: "/products", label: "Products & Prices", icon: Package },
+      { to: "/messages", label: "Messages", icon: MessageSquare },
     ],
   },
   {
@@ -82,8 +107,10 @@ export function Layout() {
   const { user, logout } = useAuth();
   const { isSuperAdmin, plantId, plant } = usePlant();
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
   // The live map fills the whole content area instead of the padded column.
-  const fullBleed = useLocation().pathname === "/";
+  const fullBleed = pathname === "/";
+  const pendingStores = usePendingStores(plantId, pathname);
 
   const initials = (user?.name ?? "?")
     .split(" ")
@@ -135,6 +162,15 @@ export function Layout() {
                     <>
                       <Icon className={`h-[17px] w-[17px] ${isActive ? "text-brand-600" : "text-sand-500"}`} />
                       {label}
+                      {to === "/stores" && pendingStores > 0 ? (
+                        <span
+                          className="ml-auto flex items-center gap-1.5 text-[12px] font-semibold text-brand-700"
+                          title={`${pendingStores} ${pendingStores === 1 ? "shop" : "shops"} waiting for approval`}
+                        >
+                          <span className="h-2 w-2 bg-brand-600" />
+                          {pendingStores}
+                        </span>
+                      ) : null}
                     </>
                   )}
                 </NavLink>

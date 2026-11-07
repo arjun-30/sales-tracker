@@ -1,4 +1,5 @@
 export type RootStackParamList = {
+  OffDuty: undefined;
   Tabs: undefined;
   NewOrder: undefined;
   Profile: undefined;
