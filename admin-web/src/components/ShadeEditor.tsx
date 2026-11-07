@@ -96,8 +96,12 @@ export function ShadeEditor({
       )}
       {canEdit ? (
         <form onSubmit={add} className="mt-3 flex flex-wrap items-center gap-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Shade name, e.g. Ivory" className="w-48" />
-          <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Card no." className="w-28" />
+          <div className="w-56">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Shade name, e.g. Ivory" />
+          </div>
+          <div className="w-28">
+            <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Card no." />
+          </div>
           <input
             type="color"
             value={hex}

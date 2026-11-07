@@ -35,6 +35,16 @@ export interface Product {
   category: string;
   active: boolean;
   variants: ProductVariant[];
+  // Colours picked after the product code; empty when the product has none.
+  shades?: ProductShade[];
+}
+
+export interface ProductShade {
+  id: string;
+  productId: string;
+  name: string;
+  code: string | null;
+  hex: string | null;
 }
 
 // A catalogue size, or (variantId null) a custom size priced at the shop:
@@ -48,6 +58,7 @@ export interface OrderItem {
   product: Product | null;
   customName: string | null;
   customSize: string | null;
+  shadeName?: string | null;
 }
 
 export interface Store {
@@ -62,9 +73,12 @@ export interface Store {
   // A shop a salesperson added waits for the office before others see it.
   status: "pending" | "approved";
   createdBy: { id: string; name: string } | null;
+  gstin?: string | null;
+  // When the salesperson should come back (ISO date at midnight UTC).
+  nextVisitOn?: string | null;
 }
 
-export type OrderStatus = "pending" | "confirmed" | "delivered" | "cancelled";
+export type OrderStatus = "pending" | "confirmed" | "dispatched" | "delivered" | "cancelled";
 
 export interface Order {
   id: string;
@@ -98,4 +112,11 @@ export interface Visit {
   checkOutLat: number | null;
   checkOutLng: number | null;
   notes: string | null;
+  storeId?: string | null;
+  paymentAmount?: number | null;
+  paymentMode?: PaymentMode | null;
+  paymentRef?: string | null;
+  nextVisitOn?: string | null;
 }
+
+export type PaymentMode = "cash" | "upi" | "cheque" | "bank_transfer" | "credit";

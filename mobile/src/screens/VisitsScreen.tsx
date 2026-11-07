@@ -10,7 +10,8 @@ import { useDuty } from "../context/DutyContext";
 import type { Store, Visit } from "../lib/types";
 import type { RootStackParamList } from "../navigation/types";
 import { Button, Card, EmptyState, Field, Loading, SectionLabel } from "../components/ui";
-import { colors, formatDuration, formatTime } from "../theme";
+import { CheckoutForm, type CheckoutDetails } from "../components/CheckoutForm";
+import { colors, formatDuration, formatINR, formatTime } from "../theme";
 
 // Shops listed to pick from: the nearest, or the best matches for a search.
 const SHOPS_SHOWN = 5;
@@ -48,6 +49,7 @@ export default function VisitsScreen() {
   const [picked, setPicked] = useState<Store | null>(null);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
   const [, setTick] = useState(0);
 
   const load = useCallback(async () => {
@@ -142,7 +144,7 @@ export default function VisitsScreen() {
     }
   }
 
-  async function handleCheckOut() {
+  async function handleCheckOut(details: CheckoutDetails) {
     if (!openVisit) return;
     setSubmitting(true);
     try {
@@ -151,8 +153,10 @@ export default function VisitsScreen() {
         Alert.alert("Location unavailable", "Turn on location to check out.");
         return;
       }
-      await api(`/api/visits/${openVisit.id}/checkout`, { method: "POST", body: JSON.stringify(pos) });
+      await api(`/api/visits/${openVisit.id}/checkout`, { method: "POST", body: JSON.stringify({ ...pos, ...details }) });
+      setCheckingOut(false);
       await load();
+      loadStores();
     } catch (err) {
       Alert.alert("Couldn't check out", err instanceof Error ? err.message : "Please try again.");
     } finally {
@@ -187,7 +191,20 @@ export default function VisitsScreen() {
           <Text style={styles.activeShop}>{openVisit.shopName}</Text>
           <Text style={styles.meta}>Checked in at {formatTime(openVisit.checkInAt)}</Text>
           {openVisit.notes ? <Text style={styles.notes}>{openVisit.notes}</Text> : null}
-          <Button label="Check out" icon="log-out-outline" onPress={handleCheckOut} loading={submitting} />
+          {checkingOut ? (
+            <CheckoutForm
+              shopName={openVisit.shopName}
+              hasOwnerPhone={!!stores.find((s) => s.id === openVisit.storeId)?.phone}
+              submitting={submitting}
+              onSubmit={handleCheckOut}
+              onCancel={() => setCheckingOut(false)}
+            />
+          ) : (
+            <View style={{ gap: 8 }}>
+              <Button label="Take order here" icon="cart-outline" onPress={() => navigation.navigate("NewOrder")} variant="secondary" />
+              <Button label="Check out" icon="log-out-outline" onPress={() => setCheckingOut(true)} />
+            </View>
+          )}
         </Card>
       ) : !onDuty ? (
         <Card style={styles.card}>
@@ -282,6 +299,11 @@ export default function VisitsScreen() {
                       {formatTime(v.checkInAt)} – {formatTime(v.checkOutAt!)}
                       {v.notes ? `  ·  ${v.notes}` : ""}
                     </Text>
+                    {v.paymentAmount || v.paymentMode === "credit" ? (
+                      <Text style={styles.paid}>
+                        {v.paymentMode === "credit" ? "On credit" : `${formatINR(v.paymentAmount!)} received`}
+                      </Text>
+                    ) : null}
                   </View>
                   <Text style={styles.duration}>{formatDuration(v.checkInAt, v.checkOutAt)}</Text>
                 </View>
@@ -332,5 +354,6 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, marginLeft: 16 },
   shop: { fontSize: 15, fontWeight: "600", color: colors.text },
   rowMeta: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  paid: { fontSize: 13, fontWeight: "600", color: colors.success, marginTop: 2 },
   duration: { fontSize: 14, fontWeight: "600", color: colors.text, fontVariant: ["tabular-nums"] },
 });

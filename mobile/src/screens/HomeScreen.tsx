@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -51,6 +51,20 @@ export default function HomeScreen() {
   const [stores, setStores] = useState<Store[] | null>(null);
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Shops whose next visit (set at checkout) is today or already past.
+  const dueShops = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const t = new Date();
+    const today = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+    return (stores ?? [])
+      .filter((st) => st.nextVisitOn && st.nextVisitOn.slice(0, 10) <= today)
+      .map((st) => {
+        const day = st.nextVisitOn!.slice(0, 10);
+        const days = Math.round((Date.parse(today) - Date.parse(day)) / 86_400_000);
+        return { store: st, overdue: days > 0, days };
+      })
+      .sort((a, b) => b.days - a.days);
+  }, [stores]);
 
   // The plant's shops for the map, and where the salesperson is now.
   // The map shows as soon as the shops arrive; the position joins it when it comes.
@@ -193,6 +207,33 @@ export default function HomeScreen() {
         </View>
         </View>
 
+        {dueShops.length > 0 ? (
+          <View style={styles.section}>
+            <SectionLabel>{`Due for a visit · ${dueShops.length}`}</SectionLabel>
+            <Card style={styles.dueCard}>
+              {dueShops.slice(0, 6).map((d, i) => (
+                <TouchableOpacity
+                  key={d.store.id}
+                  style={[styles.dueRow, i > 0 && styles.dueDivider]}
+                  onPress={() => navigation.navigate("Visits")}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.dueName} numberOfLines={1}>
+                      {d.store.name}
+                    </Text>
+                    <Text style={styles.dueMeta} numberOfLines={1}>
+                      {d.store.address ?? d.store.ownerName ?? ""}
+                    </Text>
+                  </View>
+                  <Text style={[styles.dueWhen, d.overdue && { color: colors.danger }]}>
+                    {d.overdue ? `${d.days} ${d.days === 1 ? "day" : "days"} late` : "Today"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </Card>
+          </View>
+        ) : null}
+
         <View style={styles.section}>
           <SectionLabel>{stores && stores.length > 0 ? `Shops · ${stores.length}` : "Shops"}</SectionLabel>
           {stores ? <StoreMap stores={stores} me={me} /> : <Card style={styles.mapLoading}><ActivityIndicator color={colors.textMuted} /></Card>}
@@ -245,6 +286,12 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40, gap: 28 },
   section: { gap: 12 },
+  dueCard: { paddingVertical: 2, paddingHorizontal: 16 },
+  dueRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
+  dueDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  dueName: { fontSize: 15, fontWeight: "600", color: colors.text },
+  dueMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  dueWhen: { fontSize: 13, fontWeight: "700", color: colors.warning },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   logo: { width: 92, height: 32 },
   avatar: {

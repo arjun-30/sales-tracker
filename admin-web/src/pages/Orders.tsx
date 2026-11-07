@@ -243,18 +243,22 @@ export function Orders() {
                       </Td>
                       <Td className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">
-                          {actionsByStatus[o.status].map((a) => (
-                            <Button
-                              key={a.to}
-                              size="sm"
-                              variant={a.to === "cancelled" ? "ghost" : "secondary"}
-                              disabled={updatingId === o.id}
-                              onClick={() => changeStatus(o, a.to)}
-                            >
-                              {a.label}
-                            </Button>
-                          ))}
                           <PrintButton orderId={o.id} />
+                          {/* Only the next step here; cancel and the rest are in the opened order. */}
+                          {actionsByStatus[o.status]
+                            .filter((a) => a.to !== "cancelled")
+                            .slice(0, 1)
+                            .map((a) => (
+                              <Button
+                                key={a.to}
+                                size="sm"
+                                variant="secondary"
+                                disabled={updatingId === o.id}
+                                onClick={() => changeStatus(o, a.to)}
+                              >
+                                {a.label}
+                              </Button>
+                            ))}
                         </div>
                       </Td>
                     </Tr>
@@ -262,7 +266,7 @@ export function Orders() {
                       <tr className="border-b border-neutral-200 bg-neutral-50">
                         <td />
                         <td colSpan={7} className="px-4 pb-5 pt-1">
-                          <OrderDetail order={o} />
+                          <OrderDetail order={o} busy={updatingId === o.id} onAction={(to) => changeStatus(o, to)} />
                         </td>
                       </tr>
                     )}
@@ -276,7 +280,7 @@ export function Orders() {
   );
 }
 
-function OrderDetail({ order }: { order: Order }) {
+function OrderDetail({ order, busy, onAction }: { order: Order; busy: boolean; onAction: (to: OrderStatus) => void }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
       <div className="overflow-hidden rounded-md border border-neutral-200 bg-white">
@@ -327,6 +331,21 @@ function OrderDetail({ order }: { order: Order }) {
         </table>
       </div>
       <dl className="space-y-3 text-sm">
+        {actionsByStatus[order.status].length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {actionsByStatus[order.status].map((a) => (
+              <Button
+                key={a.to}
+                size="sm"
+                variant={a.to === "cancelled" ? "ghost" : "secondary"}
+                disabled={busy}
+                onClick={() => onAction(a.to)}
+              >
+                {a.to === "cancelled" ? "Cancel order" : a.label}
+              </Button>
+            ))}
+          </div>
+        ) : null}
         <Detail label="Order ID" value={<span className="font-mono text-xs">{order.id}</span>} />
         <Detail label="Customer phone" value={order.customerPhone || "—"} />
         <Detail label="Shop" value={order.shopName || "—"} />

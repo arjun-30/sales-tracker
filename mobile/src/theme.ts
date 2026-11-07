@@ -30,6 +30,7 @@ export const radius = { sm: 8, md: 12, lg: 16, pill: 999 };
 export const statusTone = {
   pending: { fg: colors.warning, icon: "time-outline", label: "Pending" },
   confirmed: { fg: "#0369a1", icon: "checkmark-outline", label: "Confirmed" },
+  dispatched: { fg: "#4338ca", icon: "car-outline", label: "On the way" },
   delivered: { fg: colors.success, icon: "checkmark-done-outline", label: "Delivered" },
   cancelled: { fg: colors.danger, icon: "close-circle-outline", label: "Cancelled" },
 } as const;

@@ -128,26 +128,26 @@ export function StaffAttendance() {
             <table className="w-full border-collapse text-[12px]">
               <thead>
                 <tr className="border-b border-neutral-200 bg-neutral-50 text-neutral-500">
-                  <th className="sticky left-0 z-10 min-w-[180px] bg-neutral-50 px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider">
+                  <th className="sticky left-0 z-10 min-w-[150px] bg-neutral-50 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider">
                     Staff
                   </th>
                   {data.dates.map((d) => (
                     <th
                       key={d}
-                      className={`w-7 min-w-[28px] px-0 py-2 text-center font-medium ${weekday(d) === 0 ? "text-neutral-300" : ""}`}
+                      className={`w-6 min-w-[24px] px-0 py-2 text-center font-medium ${weekday(d) === 0 ? "text-neutral-300" : ""}`}
                     >
                       {Number(d.slice(8))}
                     </th>
                   ))}
-                  <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider">P</th>
-                  <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider">H</th>
-                  <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wider">Hours</th>
+                  <th className="px-2 py-2 text-right text-[11px] font-semibold uppercase tracking-wider">P</th>
+                  <th className="px-2 py-2 text-right text-[11px] font-semibold uppercase tracking-wider">H</th>
+                  <th className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider">Hours</th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.employee.id} className="border-b border-neutral-100 hover:bg-neutral-50/60">
-                    <td className="sticky left-0 z-10 bg-white px-4 py-2">
+                    <td className="sticky left-0 z-10 bg-white px-3 py-2">
                       <Link
                         to={`/attendance?code=${encodeURIComponent(r.employee.employeeCode ?? "")}`}
                         className="font-medium text-neutral-900 hover:text-brand-700 hover:underline"
@@ -179,9 +179,9 @@ export function StaffAttendance() {
                         </td>
                       );
                     })}
-                    <td className="px-3 py-2 text-right font-semibold tabular-nums text-neutral-900">{r.present}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-neutral-700">{r.half}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-neutral-700">{(r.totalMinutes / 60).toFixed(1)}</td>
+                    <td className="px-2 py-2 text-right font-semibold tabular-nums text-neutral-900">{r.present}</td>
+                    <td className="px-2 py-2 text-right tabular-nums text-neutral-700">{r.half}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-neutral-700">{(r.totalMinutes / 60).toFixed(1)}</td>
                   </tr>
                 ))}
               </tbody>

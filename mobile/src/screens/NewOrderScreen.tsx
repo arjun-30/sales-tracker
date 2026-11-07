@@ -20,7 +20,8 @@ import { api } from "../lib/api";
 import { useDuty } from "../context/DutyContext";
 import { getCurrentPosition } from "../lib/locationTask";
 import { distanceKm, formatKm, type LatLng } from "../lib/geo";
-import type { Order, Product, Store } from "../lib/types";
+import type { Order, Product, ProductShade, Store, Visit } from "../lib/types";
+import { gstinProblem, normalizeGstin } from "../lib/gstin";
 import type { RootStackParamList } from "../navigation/types";
 import { Button, Card, Field } from "../components/ui";
 import { VOICE_NOTE_MIME, VoiceRecorder, type RecordedNote } from "../components/VoiceNote";
@@ -37,6 +38,9 @@ interface CartLine {
   unitPrice: number;
   quantity: number;
   custom: boolean;
+  // The colour: a shade from the product's list, or typed for a custom line.
+  shadeId?: string;
+  shadeName?: string;
 }
 
 // The custom-item form: product fixed when it came from the catalogue.
@@ -46,6 +50,7 @@ interface CustomDraft {
   size: string;
   quantity: number;
   price: string;
+  shade: string;
 }
 
 const MAX_RESULTS = 6;
@@ -73,6 +78,11 @@ export default function NewOrderScreen() {
   const [pickingStore, setPickingStore] = useState(false);
   const [storeQuery, setStoreQuery] = useState("");
   const [customDraft, setCustomDraft] = useState<CustomDraft | null>(null);
+  // The colour picked for the product on screen, when it has shades.
+  const [shade, setShade] = useState<ProductShade | null>(null);
+  const [gstin, setGstin] = useState("");
+  // Checked in at a shop: the order is that shop's, and can't be changed here.
+  const [visit, setVisit] = useState<Visit | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const productsY = useRef(0);
   // Bring the product search above the keyboard when it is tapped.
@@ -90,7 +100,18 @@ export default function NewOrderScreen() {
       .then((d) => setStores(d.stores))
       .catch(() => {});
     getCurrentPosition().then(setHere);
+    api<{ visits: Visit[] }>("/api/visits")
+      .then((d) => setVisit(d.visits.find((v) => !v.checkOutAt && v.storeId) ?? null))
+      .catch(() => {});
   }, []);
+
+  // Once both are loaded, the checked-in shop is the order's shop.
+  useEffect(() => {
+    if (!visit?.storeId) return;
+    const s = stores.find((x) => x.id === visit.storeId);
+    if (s) chooseStore(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visit, stores]);
 
   const storeMatches = useMemo(() => {
     const q = storeQuery.trim().toLowerCase();
@@ -105,6 +126,7 @@ export default function NewOrderScreen() {
     Keyboard.dismiss();
     setStore(s);
     setShopName(s.name);
+    if (s.gstin) setGstin(s.gstin);
     if (!customerName.trim()) setCustomerName(s.ownerName || s.name);
     if (!customerPhone && s.phone) setCustomerPhone(s.phone);
     setPickingStore(false);
@@ -129,16 +151,25 @@ export default function NewOrderScreen() {
     Keyboard.dismiss();
     setFound(product);
     setDraftQty({});
+    setShade(null);
     setQuery("");
   }
 
   function addToCart() {
     if (!found) return;
+    const shades = found.shades ?? [];
+    if (shades.length > 0 && !shade) {
+      Alert.alert("Pick a colour", "Choose the shade the customer wants.");
+      return;
+    }
+    const shadeLabel = shade ? (shade.code ? `${shade.name} (${shade.code})` : shade.name) : undefined;
     const lines: CartLine[] = found.variants
       .filter((v) => (draftQty[v.id] ?? 0) > 0)
       .map((v) => ({
-        key: v.id,
+        key: shade ? `${v.id}:${shade.id}` : v.id,
         variantId: v.id,
+        shadeId: shade?.id,
+        shadeName: shadeLabel,
         productName: found.name,
         sizeLabel: v.sizeLabel,
         unitPrice: v.price,
@@ -160,6 +191,7 @@ export default function NewOrderScreen() {
     });
     setFound(null);
     setDraftQty({});
+    setShade(null);
   }
 
   // Start a custom size: of the product on screen, or of one the customer
@@ -172,6 +204,7 @@ export default function NewOrderScreen() {
       size: "",
       quantity: 1,
       price: "",
+      shade: "",
     });
     setFound(null);
     setQuery("");
@@ -202,6 +235,7 @@ export default function NewOrderScreen() {
         unitPrice: Math.round(price * 100) / 100,
         quantity: customDraft.quantity,
         custom: true,
+        shadeName: customDraft.shade.trim() || undefined,
       },
     ]);
     setCustomDraft(null);
@@ -226,6 +260,11 @@ export default function NewOrderScreen() {
       Alert.alert("No products yet", "Add at least one product to the order.");
       return;
     }
+    const gstinError = gstinProblem(gstin);
+    if (gstinError) {
+      Alert.alert("Check the GSTIN", gstinError);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -239,6 +278,7 @@ export default function NewOrderScreen() {
         lng: pos?.lng,
         voiceNoteDurationMs: voiceNote?.durationMs,
         storeId: store?.id,
+        gstin: normalizeGstin(gstin) || undefined,
         items: cart.map((l) =>
           l.custom
             ? {
@@ -246,8 +286,9 @@ export default function NewOrderScreen() {
                 customSize: l.sizeLabel,
                 quantity: l.quantity,
                 unitPrice: l.unitPrice,
+                shadeName: l.shadeName,
               }
-            : { variantId: l.variantId, quantity: l.quantity }
+            : { variantId: l.variantId, quantity: l.quantity, shadeId: l.shadeId }
         ),
       });
       // With a voice note the order goes as multipart: the JSON plus the file.
@@ -302,9 +343,13 @@ export default function NewOrderScreen() {
                       {[storeKm !== null ? `${formatKm(storeKm)} from you` : null, store.address].filter(Boolean).join("  ·  ")}
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={() => setPickingStore(true)} hitSlop={10}>
-                    <Text style={styles.customLinkText}>Change</Text>
-                  </TouchableOpacity>
+                  {visit?.storeId === store.id ? (
+                    <Text style={styles.checkedIn}>Checked in</Text>
+                  ) : (
+                    <TouchableOpacity onPress={() => setPickingStore(true)} hitSlop={10}>
+                      <Text style={styles.customLinkText}>Change</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ) : pickingStore || stores.length > 0 ? (
                 <>
@@ -369,6 +414,24 @@ export default function NewOrderScreen() {
               value={customerPhone}
               onChangeText={(t) => setCustomerPhone(t.replace(/\D/g, ""))}
             />
+            <View style={{ gap: 4 }}>
+              <Field
+                label="GSTIN (optional)"
+                placeholder="33AAACR5055K1ZE"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={15}
+                value={gstin}
+                onChangeText={(t) => setGstin(normalizeGstin(t))}
+              />
+              {gstin ? (
+                gstinProblem(gstin) ? (
+                  <Text style={styles.gstinBad}>{gstinProblem(gstin)}</Text>
+                ) : (
+                  <Text style={styles.gstinOk}>GSTIN looks right</Text>
+                )
+              ) : null}
+            </View>
             <Field label="Notes (optional)" placeholder="Delivery date, credit terms…" value={notes} onChangeText={setNotes} />
             <VoiceRecorder value={voiceNote} onChange={setVoiceNote} />
           </Card>
@@ -415,6 +478,12 @@ export default function NewOrderScreen() {
                   value={customDraft.price}
                   onChangeText={(t) => setCustomDraft({ ...customDraft, price: t.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1") })}
                 />
+                <Field
+                  label="Colour / shade (optional)"
+                  placeholder="e.g. Ivory 2041"
+                  value={customDraft.shade}
+                  onChangeText={(t) => setCustomDraft({ ...customDraft, shade: t })}
+                />
                 <View style={styles.sizeRow}>
                   <Text style={[styles.sizeLabel, { flex: 1 }]}>Quantity</Text>
                   <Stepper
@@ -445,6 +514,31 @@ export default function NewOrderScreen() {
                     <Ionicons name="close" size={22} color={colors.textMuted} />
                   </TouchableOpacity>
                 </View>
+                {found.shades && found.shades.length > 0 ? (
+                  <View style={styles.shadeBlock}>
+                    <Text style={styles.fixedLabel}>Colour{shade ? `: ${shade.name}` : ""}</Text>
+                    <View style={styles.shadeWrap}>
+                      {found.shades.map((sh) => {
+                        const on = shade?.id === sh.id;
+                        return (
+                          <TouchableOpacity
+                            key={sh.id}
+                            onPress={() => setShade(on ? null : sh)}
+                            style={[styles.shadeChip, on && styles.shadeChipOn]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: on }}
+                          >
+                            <View style={[styles.swatch, { backgroundColor: sh.hex ?? colors.background }]} />
+                            <Text style={[styles.shadeText, on && styles.shadeTextOn]} numberOfLines={1}>
+                              {sh.name}
+                              {sh.code ? ` ${sh.code}` : ""}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
                 {found.variants.map((v) => (
                   <View key={v.id} style={styles.sizeRow}>
                     <View style={{ flex: 1 }}>
@@ -540,7 +634,8 @@ export default function NewOrderScreen() {
                         {displayProductName(l.productName)}
                       </Text>
                       <Text style={styles.cartMeta}>
-                        {l.sizeLabel === "STD" ? "Standard pack" : l.sizeLabel} · {formatINR(l.unitPrice)} each
+                        {l.sizeLabel === "STD" ? "Standard pack" : l.sizeLabel}
+                        {l.shadeName ? ` · ${l.shadeName}` : ""} · {formatINR(l.unitPrice)} each
                         {l.custom ? "  ·  custom" : ""}
                       </Text>
                       <Text style={styles.cartLineTotal}>{formatINR(l.unitPrice * l.quantity)}</Text>
@@ -679,6 +774,27 @@ const styles = StyleSheet.create({
     borderColor: colors.borderStrong,
     borderRadius: radius.md,
   },
+  checkedIn: { fontSize: 13, fontWeight: "700", color: colors.success },
+  gstinBad: { fontSize: 12, color: colors.danger, fontWeight: "600" },
+  gstinOk: { fontSize: 12, color: colors.success, fontWeight: "600" },
+  shadeBlock: { paddingVertical: 8, gap: 2 },
+  shadeWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  shadeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+    maxWidth: "100%",
+  },
+  shadeChipOn: { borderColor: colors.text, backgroundColor: colors.text },
+  swatch: { width: 16, height: 16, borderRadius: 4, borderWidth: 1, borderColor: "rgba(0,0,0,0.15)" },
+  shadeText: { fontSize: 13, fontWeight: "600", color: colors.text, flexShrink: 1 },
+  shadeTextOn: { color: "#fff" },
   farWarning: { fontSize: 13, color: colors.warning, fontWeight: "600", lineHeight: 19 },
   stepper: {
     flexDirection: "row",

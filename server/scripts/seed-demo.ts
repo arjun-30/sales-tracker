@@ -118,6 +118,17 @@ const at = (day: string, minutesFromMidnight: number) =>
 const isSunday = (day: string) => new Date(`${day}T12:00:00+05:30`).getUTCDay() === 0;
 
 // ---- main -----------------------------------------------------------------------
+const SAMPLE_SHADES = [
+  { name: "Brilliant White", code: "1001", hex: "#f7f7f2" },
+  { name: "Ivory", code: "2041", hex: "#efe6d2" },
+  { name: "Lemon Mist", code: "2210", hex: "#f2e9a8" },
+  { name: "Peach Glow", code: "3105", hex: "#f4c9a8" },
+  { name: "Sky Blue", code: "5120", hex: "#a9cbe6" },
+  { name: "Mint Green", code: "6033", hex: "#bfe3c7" },
+  { name: "Signal Red", code: "8001", hex: "#c8102e" },
+  { name: "Charcoal Grey", code: "9040", hex: "#4a4a4a" },
+];
+
 async function main() {
   console.log("Wiping orders, visits, duty sessions and location history…");
   await prisma.$transaction([
@@ -141,6 +152,17 @@ async function main() {
       });
     }
   }
+  // Placeholder shades on emulsions and enamels until Roalux sends its shade
+  // card. Only added to products with none, so the office's real ones stay.
+  console.log("Adding sample shades…");
+  for (const p of products) {
+    if (!/EMULSION|ENAMEL|DISTEMPER|EXTERIOR|INTERIOR/i.test(`${p.name} ${p.category}`)) continue;
+    if ((await prisma.productShade.count({ where: { productId: p.id } })) > 0) continue;
+    await prisma.productShade.createMany({
+      data: SAMPLE_SHADES.map((s, i) => ({ productId: p.id, ...s, sortOrder: i })),
+    });
+  }
+
   const variants = await prisma.productVariant.findMany({
     where: { active: true, product: { active: true } },
     include: { product: true },

@@ -16,6 +16,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: "all", label: "All" },
   { value: "pending", label: "Pending" },
   { value: "confirmed", label: "Confirmed" },
+  { value: "dispatched", label: "On the way" },
   { value: "delivered", label: "Delivered" },
   { value: "cancelled", label: "Cancelled" },
 ];
@@ -59,7 +60,7 @@ export default function OrdersScreen() {
   );
 
   const counts = useMemo(() => {
-    const c: Record<Tab, number> = { all: orders.length, pending: 0, confirmed: 0, delivered: 0, cancelled: 0 };
+    const c: Record<Tab, number> = { all: orders.length, pending: 0, confirmed: 0, dispatched: 0, delivered: 0, cancelled: 0 };
     for (const o of orders) c[o.status]++;
     return c;
   }, [orders]);
@@ -196,7 +197,8 @@ function OrderRow({
                   {itemName(i)}
                 </Text>
                 <Text style={styles.lineMeta}>
-                  {itemSize(i)} · {i.quantity} × {formatINR(i.unitPrice)}
+                  {itemSize(i)}
+                  {i.shadeName ? ` · ${i.shadeName}` : ""} · {i.quantity} × {formatINR(i.unitPrice)}
                 </Text>
               </View>
               <Text style={styles.lineTotal}>{formatINR(i.unitPrice * i.quantity)}</Text>
