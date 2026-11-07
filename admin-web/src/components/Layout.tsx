@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   BarChart3,
   Building2,
+  CalendarCheck,
   Clock,
   Factory,
   LogOut,
@@ -66,6 +67,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: "Team",
     items: [
       { to: "/employees", label: "Employees", icon: Users },
+      { to: "/staff-attendance", label: "Staff attendance", icon: CalendarCheck },
       { to: "/attendance", label: "Employee history", icon: Clock },
       { to: "/plants", label: "Plants & Admins", icon: Factory, superOnly: true },
     ],

@@ -37,6 +37,10 @@ export interface Store {
   status: "pending" | "approved";
   // When the owner read back the SMS code sent to the number.
   phoneVerifiedAt: string | null;
+  // Checked for layout and check digit by the server.
+  gstin: string | null;
+  // YYYY-MM-DD (as an ISO date at midnight UTC), set at visit checkout.
+  nextVisitOn: string | null;
   createdAt: string;
   plant: PlantRef;
   createdBy: { id: string; name: string } | null;
@@ -116,6 +120,18 @@ export interface Product {
   category: string;
   active: boolean;
   variants: ProductVariant[];
+  shades: ProductShade[];
+}
+
+// A colour of a product, picked on the order line after the product code.
+export interface ProductShade {
+  id: string;
+  productId: string;
+  name: string;
+  code: string | null;
+  hex: string | null;
+  sortOrder: number;
+  active: boolean;
 }
 
 // A catalogue size, or (variantId null) a custom size the salesperson
@@ -129,9 +145,11 @@ export interface OrderItem {
   product: Product | null;
   customName: string | null;
   customSize: string | null;
+  // "Ivory (2041)": the colour picked for the line.
+  shadeName: string | null;
 }
 
-export type OrderStatus = "pending" | "confirmed" | "delivered" | "cancelled";
+export type OrderStatus = "pending" | "confirmed" | "dispatched" | "delivered" | "cancelled";
 
 export interface Order {
   id: string;
@@ -153,6 +171,16 @@ export interface Order {
   channel: "in_person" | "phone";
   storeId: string | null;
   distanceFromStoreM: number | null;
+  gstin: string | null;
+  visitId: string | null;
+  confirmedAt: string | null;
+  dispatchedAt: string | null;
+  vehicleNo: string | null;
+  driverName: string | null;
+  driverPhone: string | null;
+  deliveredAt: string | null;
+  deliveryNote: string | null;
+  deliveryProof: { createdAt: string } | null;
 }
 
 export interface Visit {
@@ -167,6 +195,12 @@ export interface Visit {
   checkOutLat: number | null;
   checkOutLng: number | null;
   notes: string | null;
+  paymentAmount: number | null;
+  paymentMode: PaymentMode | null;
+  paymentRef: string | null;
+  nextVisitOn: string | null;
+  notifyOwner: boolean;
+  storeId: string | null;
   employee: { id: string; name: string };
   district: District;
   plantId: string;
@@ -233,7 +267,7 @@ export interface DutySession {
   id: string;
   startedAt: string;
   endedAt: string | null;
-  endReason: "manual" | "timeout" | "deactivated" | null;
+  endReason: "manual" | "timeout" | "deactivated" | "day_end" | null;
   minutes: number;
 }
 
@@ -249,4 +283,37 @@ export interface AttendanceReport {
   days: WorkedDay[];
   sessions: DutySession[];
   activity: { orders: number; sales: number; visits: number };
+}
+
+export type PaymentMode = "cash" | "upi" | "cheque" | "bank_transfer" | "credit";
+
+export const PAYMENT_MODE_LABEL: Record<PaymentMode, string> = {
+  cash: "Cash",
+  upi: "UPI",
+  cheque: "Cheque",
+  bank_transfer: "Bank transfer",
+  credit: "Credit",
+};
+
+export type AttendanceStatus = "present" | "half" | "absent";
+
+export interface MonthlyAttendance {
+  month: string;
+  dates: string[];
+  fullDayMinutes: number;
+  today: string;
+  rows: {
+    employee: { id: string; name: string; employeeCode: string | null; active: boolean; plantCode: string | null };
+    days: {
+      date: string;
+      minutes: number;
+      firstOn: string | null;
+      lastOff: string | null;
+      status: AttendanceStatus;
+      autoEnded: boolean;
+    }[];
+    present: number;
+    half: number;
+    totalMinutes: number;
+  }[];
 }

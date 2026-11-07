@@ -12,6 +12,7 @@ import { Attendance } from "./pages/Attendance";
 import { Stores } from "./pages/Stores";
 import { Plants } from "./pages/Plants";
 import { Messages } from "./pages/Messages";
+import { StaffAttendance } from "./pages/StaffAttendance";
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
         <Route path="products" element={<Products />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="attendance" element={<Attendance />} />
+        <Route path="staff-attendance" element={<StaffAttendance />} />
         <Route path="stores" element={<Stores />} />
         <Route path="plants" element={<Plants />} />
         <Route path="messages" element={<Messages />} />

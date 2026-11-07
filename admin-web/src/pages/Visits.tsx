@@ -3,7 +3,7 @@ import { Clock, MapPin, Receipt, Search, Store, Timer, TrendingUp } from "lucide
 import { api } from "../lib/api";
 import { usePlant } from "../context/PlantContext";
 import { formatDay, formatINR, formatMinutes, formatTime } from "../lib/format";
-import type { District, Employee, Order, Visit } from "../lib/types";
+import { PAYMENT_MODE_LABEL, type District, type Employee, type Order, type Visit } from "../lib/types";
 import { Card, PageHeader, Segmented, StatCard, Tabs } from "../components/ui/Card";
 import { Input, Select } from "../components/ui/Input";
 import { MessageRow, Table, Td, Th, Tr } from "../components/ui/Table";
@@ -203,19 +203,21 @@ export function Visits() {
               <Th>Time</Th>
               <Th className="text-right">In shop</Th>
               <Th>Outcome</Th>
+              <Th>Payment</Th>
+              <Th>Next visit</Th>
               <Th className="w-10" />
             </tr>
           </thead>
           <tbody>
-            {loading && <MessageRow colSpan={6}>Loading visits…</MessageRow>}
+            {loading && <MessageRow colSpan={8}>Loading visits…</MessageRow>}
             {!loading && visible.length === 0 && (
-              <MessageRow colSpan={6}>{visits.length ? "No visits match these filters." : "No visits in this period."}</MessageRow>
+              <MessageRow colSpan={8}>{visits.length ? "No visits match these filters." : "No visits in this period."}</MessageRow>
             )}
             {!loading &&
               days.map((day) => (
                 <Fragment key={day.key}>
                   <tr className="border-b border-neutral-200 bg-sand-50">
-                    <td colSpan={6} className="px-5 py-2">
+                    <td colSpan={8} className="px-5 py-2">
                       <span className="text-[13px] font-semibold text-neutral-800">{day.label}</span>
                       <span className="ml-3 text-xs text-neutral-500">
                         {day.visits.length} {day.visits.length === 1 ? "visit" : "visits"} · {formatMinutes(day.minutes)} in shops
@@ -259,6 +261,29 @@ export function Visits() {
                           ) : (
                             <span className="text-[13px] text-neutral-400">No order</span>
                           )}
+                        </Td>
+                        <Td className="whitespace-nowrap text-[13px]">
+                          {v.paymentMode === "credit" ? (
+                            <span className="text-amber-700">On credit</span>
+                          ) : v.paymentAmount ? (
+                            <>
+                              <div className="font-medium tabular-nums text-neutral-900">{formatINR(v.paymentAmount)}</div>
+                              <div className="text-xs text-neutral-500">
+                                {v.paymentMode ? PAYMENT_MODE_LABEL[v.paymentMode] : ""}
+                                {v.paymentRef ? ` · ${v.paymentRef}` : ""}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-neutral-400">—</span>
+                          )}
+                        </Td>
+                        <Td className="whitespace-nowrap text-[13px]">
+                          {v.nextVisitOn ? (
+                            new Date(`${v.nextVisitOn.slice(0, 10)}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                          ) : (
+                            <span className="text-neutral-400">—</span>
+                          )}
+                          {!v.notifyOwner ? <div className="text-xs text-neutral-500">No SMS to owner</div> : null}
                         </Td>
                         <Td>
                           <a

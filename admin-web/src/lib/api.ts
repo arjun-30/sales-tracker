@@ -54,7 +54,8 @@ export async function api<T>(path: string, options: RequestInit = {}, retry = tr
   const res = await fetch(`${API_URL}${withPlantScope(path)}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      // A file upload (FormData) sets its own multipart content type.
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },

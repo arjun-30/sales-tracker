@@ -119,6 +119,7 @@ function StoreForm({ store, onDone, onCancel }: { store: Store | null; onDone: (
   const [phone, setPhone] = useState(store?.phone ?? "");
   const [address, setAddress] = useState(store?.address ?? "");
   const [notes, setNotes] = useState(store?.notes ?? "");
+  const [gstin, setGstin] = useState(store?.gstin ?? "");
   const [position, setPosition] = useState<LatLng | null>(store ? { lat: store.lat, lng: store.lng } : null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -138,6 +139,7 @@ function StoreForm({ store, onDone, onCancel }: { store: Store | null; onDone: (
         phone,
         address,
         notes,
+        gstin,
         lat: position.lat,
         lng: position.lng,
         ...(isSuperAdmin ? { plantId } : {}),
@@ -194,6 +196,15 @@ function StoreForm({ store, onDone, onCancel }: { store: Store | null; onDone: (
           <div className="sm:col-span-2">
             <Label hint="Optional">Address</Label>
             <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, area, town" />
+          </div>
+          <div className="sm:col-span-2">
+            <Label hint={gstin ? `${gstin.length}/15` : "Optional, checked for typing mistakes"}>GSTIN</Label>
+            <Input
+              value={gstin}
+              onChange={(e) => setGstin(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 15))}
+              placeholder="33AAACR5055K1ZE"
+              className="font-mono"
+            />
           </div>
           <div className="sm:col-span-2">
             <Label hint="Optional">Notes</Label>
@@ -425,14 +436,15 @@ export function Stores() {
               <Th>Phone</Th>
               <Th>Address</Th>
               {showPlant ? <Th>Plant</Th> : null}
+              <Th>Next visit</Th>
               <Th>Added</Th>
               <Th className="text-right">Actions</Th>
             </tr>
           </thead>
           <tbody>
-            {loading ? <MessageRow colSpan={showPlant ? 6 : 5}>Loading stores…</MessageRow> : null}
+            {loading ? <MessageRow colSpan={showPlant ? 7 : 6}>Loading stores…</MessageRow> : null}
             {!loading && visible.length === 0 ? (
-              <MessageRow colSpan={showPlant ? 6 : 5}>
+              <MessageRow colSpan={showPlant ? 7 : 6}>
                 {approved.length ? "No store matches that search." : "No stores yet. Add the first one or import a list."}
               </MessageRow>
             ) : null}
@@ -453,6 +465,7 @@ export function Stores() {
                   </Td>
                   <Td className="max-w-72">
                     <div className="truncate">{s.address ?? <span className="text-neutral-400">—</span>}</div>
+                    {s.gstin ? <div className="font-mono text-xs text-neutral-500">GSTIN {s.gstin}</div> : null}
                     <a
                       href={mapsLink(s)}
                       target="_blank"
@@ -463,6 +476,9 @@ export function Stores() {
                     </a>
                   </Td>
                   {showPlant ? <Td>{s.plant.name}</Td> : null}
+                  <Td className="whitespace-nowrap">
+                    <NextVisit on={s.nextVisitOn} />
+                  </Td>
                   <Td>
                     <div>{formatDate(s.createdAt)}</div>
                     {s.createdBy ? <div className="text-xs text-neutral-500">by {s.createdBy.name}</div> : null}
@@ -484,4 +500,15 @@ export function Stores() {
       </Card>
     </div>
   );
+}
+
+// Due today or overdue in red, so the office can chase it; a later date plainly.
+function NextVisit({ on }: { on: string | null }) {
+  if (!on) return <span className="text-neutral-400">—</span>;
+  const day = on.slice(0, 10);
+  const today = new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
+  const label = new Date(`${day}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  if (day < today) return <span className="font-medium text-red-700">{label} · overdue</span>;
+  if (day === today) return <span className="font-medium text-amber-700">Today</span>;
+  return <span className="text-neutral-800">{label}</span>;
 }

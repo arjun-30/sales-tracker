@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { formatINR } from "../lib/format";
 import type { Product, ProductVariant } from "../lib/types";
 import { usePlant } from "../context/PlantContext";
+import { ShadeEditor } from "../components/ShadeEditor";
 import { Card, CardHeader, Notice, PageHeader, StatCard, Tabs } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input, Label, Select } from "../components/ui/Input";
@@ -353,6 +354,9 @@ export function Products() {
                       <Td className="font-mono text-[13px] font-semibold text-neutral-900">{p.shortCode}</Td>
                       <Td>
                         <div className="font-medium text-neutral-900">{p.name}</div>
+                        {p.shades?.some((sh) => sh.active) ? (
+                          <div className="text-xs text-neutral-500">{p.shades.filter((sh) => sh.active).length} shades</div>
+                        ) : null}
                         {missing ? (
                           <div className="text-xs text-red-600">
                             {missing === p.variants.filter((v) => v.active).length
@@ -389,6 +393,11 @@ export function Products() {
                         <td />
                         <td colSpan={4} className="px-4 pb-5 pt-2">
                           <PriceEditor product={p} plantId={plantId} onSaved={(saved) => applySaved(p.id, saved)} />
+                          <ShadeEditor
+                            product={p}
+                            canEdit={isSuperAdmin}
+                            onChange={(shades) => setProducts((prev) => prev.map((x) => (x.id === p.id ? { ...x, shades } : x)))}
+                          />
                         </td>
                       </tr>
                     )}

@@ -36,6 +36,7 @@ const END_REASON: Record<NonNullable<DutySession["endReason"]>, string> = {
   manual: "Went off duty",
   timeout: "No signal, closed automatically",
   deactivated: "Account disabled",
+  day_end: "Ended at 9 pm",
 };
 
 export function Attendance() {

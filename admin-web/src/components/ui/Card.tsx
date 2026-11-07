@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import { Check, CheckCheck, Clock, XCircle } from "lucide-react";
+import { Check, CheckCheck, Clock, Truck, XCircle } from "lucide-react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`rounded-lg border border-neutral-200 bg-white ${className}`}>{children}</div>;
@@ -170,6 +170,7 @@ export function Segmented<T extends string>({
 const orderStatus = {
   pending: { label: "Pending", icon: Clock, color: "text-amber-600" },
   confirmed: { label: "Confirmed", icon: Check, color: "text-sky-700" },
+  dispatched: { label: "Dispatched", icon: Truck, color: "text-indigo-700" },
   delivered: { label: "Delivered", icon: CheckCheck, color: "text-emerald-700" },
   cancelled: { label: "Cancelled", icon: XCircle, color: "text-red-600" },
 } as const;

@@ -1,11 +1,11 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, Mic, Search } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { ChevronDown, ChevronRight, Mic, Printer, Search, X } from "lucide-react";
 import { api, apiBlob } from "../lib/api";
 import { usePlant } from "../context/PlantContext";
 import { formatDate, formatINR, formatTime, itemName, itemSize } from "../lib/format";
 import type { District, Order, OrderStatus } from "../lib/types";
 import { Card, Notice, OrderStatusLabel, PageHeader, Tabs } from "../components/ui/Card";
-import { Input, Select } from "../components/ui/Input";
+import { Input, Label, Select } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { MessageRow, Table, Td, Th, Tr } from "../components/ui/Table";
 
@@ -16,6 +16,11 @@ const actionsByStatus: Record<OrderStatus, { to: OrderStatus; label: string }[]>
     { to: "cancelled", label: "Cancel" },
   ],
   confirmed: [
+    { to: "dispatched", label: "Dispatch" },
+    { to: "delivered", label: "Mark delivered" },
+    { to: "cancelled", label: "Cancel" },
+  ],
+  dispatched: [
     { to: "delivered", label: "Mark delivered" },
     { to: "cancelled", label: "Cancel" },
   ],
@@ -38,6 +43,8 @@ export function Orders() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Dispatch and delivery ask for details first.
+  const [form, setForm] = useState<{ order: Order; to: "dispatched" | "delivered" } | null>(null);
 
   useEffect(() => {
     api<{ districts: District[] }>("/api/districts").then((d) => setDistricts(d.districts));
@@ -52,7 +59,7 @@ export function Orders() {
   }, [districtFilter]);
 
   const counts = useMemo(() => {
-    const c: Record<TabValue, number> = { all: orders.length, pending: 0, confirmed: 0, delivered: 0, cancelled: 0 };
+    const c: Record<TabValue, number> = { all: orders.length, pending: 0, confirmed: 0, dispatched: 0, delivered: 0, cancelled: 0 };
     for (const o of orders) c[o.status]++;
     return c;
   }, [orders]);
@@ -69,17 +76,21 @@ export function Orders() {
   const visibleValue = visible.filter((o) => o.status !== "cancelled").reduce((sum, o) => sum + o.totalAmount, 0);
 
   async function changeStatus(order: Order, to: OrderStatus) {
+    if (to === "dispatched" || to === "delivered") {
+      setForm({ order, to });
+      return;
+    }
     if (to === "cancelled" && !window.confirm(`Cancel the order for ${order.customerName}? This can't be undone.`)) {
       return;
     }
     setUpdatingId(order.id);
     setError(null);
     try {
-      const { order: updated } = await api<{ order: Pick<Order, "id" | "status"> }>(
-        `/api/orders/${order.id}/status`,
-        { method: "PATCH", body: JSON.stringify({ status: to }) }
-      );
-      setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...o, status: updated.status } : o)));
+      const { order: updated } = await api<{ order: Order }>(`/api/orders/${order.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: to }),
+      });
+      mergeOrder(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update the order");
     } finally {
@@ -87,12 +98,34 @@ export function Orders() {
     }
   }
 
+  // The status endpoint returns the bare order; keep the loaded relations.
+  function mergeOrder(updated: Partial<Order> & { id: string }) {
+    setOrders((prev) =>
+      prev.map((o) => {
+        if (o.id !== updated.id) return o;
+        const { items: _i, employee: _e, district: _d, plant: _p, voiceNote: _v, deliveryProof, ...fields } = updated;
+        return { ...o, ...fields, ...(deliveryProof !== undefined ? { deliveryProof } : {}) };
+      })
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Orders"
-        description="Orders taken in the field. Confirm them, mark them delivered, or cancel them."
+        description="Orders taken in the field. Confirm, dispatch and deliver them, print the order copy, or cancel."
       />
+      {form && (
+        <SupplyForm
+          order={form.order}
+          to={form.to}
+          onClose={() => setForm(null)}
+          onSaved={(o) => {
+            mergeOrder(o);
+            setForm(null);
+          }}
+        />
+      )}
 
       {error && <Notice tone="error">{error}</Notice>}
 
@@ -105,6 +138,7 @@ export function Orders() {
               { value: "all", label: "All", count: counts.all },
               { value: "pending", label: "Pending", count: counts.pending },
               { value: "confirmed", label: "Confirmed", count: counts.confirmed },
+              { value: "dispatched", label: "Dispatched", count: counts.dispatched },
               { value: "delivered", label: "Delivered", count: counts.delivered },
               { value: "cancelled", label: "Cancelled", count: counts.cancelled },
             ]}
@@ -220,7 +254,7 @@ export function Orders() {
                               {a.label}
                             </Button>
                           ))}
-                          {actionsByStatus[o.status].length === 0 ? <span className="text-xs text-neutral-400">—</span> : null}
+                          <PrintButton orderId={o.id} />
                         </div>
                       </Td>
                     </Tr>
@@ -264,6 +298,7 @@ function OrderDetail({ order }: { order: Order }) {
                   {(i.variant?.product ?? i.product) ? (
                     <span className="ml-2 font-mono text-xs text-neutral-400">{(i.variant?.product ?? i.product)!.shortCode}</span>
                   ) : null}
+                  {i.shadeName ? <div className="text-xs text-neutral-500">Shade: {i.shadeName}</div> : null}
                 </td>
                 <td className="px-4 py-2 text-neutral-600">
                   {itemSize(i)}
@@ -295,10 +330,13 @@ function OrderDetail({ order }: { order: Order }) {
         <Detail label="Order ID" value={<span className="font-mono text-xs">{order.id}</span>} />
         <Detail label="Customer phone" value={order.customerPhone || "—"} />
         <Detail label="Shop" value={order.shopName || "—"} />
+        <Detail label="GSTIN" value={order.gstin ? <span className="font-mono text-xs">{order.gstin}</span> : "—"} />
+        <Detail label="Supply and delivery" value={<SupplyDetail order={order} />} />
         <Detail label="How it was taken" value={<HowTaken order={order} long />} />
         <Detail label="Notes" value={order.notes || "—"} />
         {order.voiceNote ? <Detail label="Voice note" value={<VoiceNote orderId={order.id} />} /> : null}
         <Detail label="Order copy" value={<OrderPdfLink orderId={order.id} />} />
+        {order.deliveryProof ? <Detail label="Delivery photo" value={<DeliveryPhoto orderId={order.id} />} /> : null}
       </dl>
     </div>
   );
@@ -397,5 +435,218 @@ function Detail({ label, value }: { label: string; value: ReactNode }) {
       <dt className="text-xs font-medium uppercase tracking-wider text-neutral-400">{label}</dt>
       <dd className="mt-0.5 text-neutral-800">{value}</dd>
     </div>
+  );
+}
+
+const dateTime = (iso: string) => `${formatDate(iso)}, ${formatTime(iso)}`;
+
+// Where the order is: confirmed, dispatched in which vehicle, delivered when.
+function SupplyDetail({ order }: { order: Order }) {
+  const lines = [
+    order.confirmedAt ? `Confirmed ${dateTime(order.confirmedAt)}` : null,
+    order.dispatchedAt ? `Dispatched ${dateTime(order.dispatchedAt)}` : null,
+    order.vehicleNo ? `Vehicle ${order.vehicleNo}` : null,
+    order.driverName || order.driverPhone ? `Driver ${[order.driverName, order.driverPhone].filter(Boolean).join(", ")}` : null,
+    order.deliveredAt ? `Delivered ${dateTime(order.deliveredAt)}` : null,
+    order.deliveryNote,
+  ].filter((l): l is string => !!l);
+  if (lines.length === 0) return <span className="text-neutral-400">Not dispatched yet</span>;
+  return (
+    <div className="space-y-0.5">
+      {lines.map((l) => (
+        <div key={l}>{l}</div>
+      ))}
+    </div>
+  );
+}
+
+// Dispatch (vehicle, driver) or delivery (time, remark, photo of the slip).
+function SupplyForm({
+  order,
+  to,
+  onClose,
+  onSaved,
+}: {
+  order: Order;
+  to: "dispatched" | "delivered";
+  onClose: () => void;
+  onSaved: (o: Partial<Order> & { id: string }) => void;
+}) {
+  const [vehicleNo, setVehicleNo] = useState(order.vehicleNo ?? "");
+  const [driverName, setDriverName] = useState(order.driverName ?? "");
+  const [driverPhone, setDriverPhone] = useState(order.driverPhone ?? "");
+  const [deliveredAt, setDeliveredAt] = useState(() => localInputValue(new Date()));
+  const [deliveryNote, setDeliveryNote] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const body =
+        to === "dispatched"
+          ? { status: to, vehicleNo, driverName, driverPhone }
+          : { status: to, deliveredAt: new Date(deliveredAt).toISOString(), deliveryNote };
+      const { order: updated } = await api<{ order: Order }>(`/api/orders/${order.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      let deliveryProof: Order["deliveryProof"] | undefined;
+      if (photo) {
+        const data = new FormData();
+        data.append("photo", photo);
+        await api(`/api/orders/${order.id}/delivery-proof`, { method: "PUT", body: data });
+        deliveryProof = { createdAt: new Date().toISOString() };
+      }
+      onSaved({ ...updated, ...(deliveryProof ? { deliveryProof } : {}) });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-[10vh]" onClick={onClose}>
+      <form
+        onSubmit={save}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-lg border border-neutral-200 bg-white shadow-xl"
+      >
+        <div className="flex items-start justify-between border-b border-neutral-200 px-5 py-4">
+          <div>
+            <h2 className="text-[15px] font-semibold text-neutral-900">
+              {to === "dispatched" ? "Dispatch order" : "Mark delivered"}
+            </h2>
+            <p className="mt-0.5 text-[13px] text-neutral-500">
+              {order.shopName || order.customerName} · {formatINR(order.totalAmount)}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-neutral-400 hover:text-neutral-700" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="space-y-4 px-5 py-4">
+          {error && <Notice tone="error">{error}</Notice>}
+          {to === "dispatched" ? (
+            <>
+              <div>
+                <Label>Vehicle number</Label>
+                <Input value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} placeholder="TN 09 AB 1234" autoFocus />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label>Driver name</Label>
+                  <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Driver phone</Label>
+                  <Input value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} inputMode="tel" />
+                </div>
+              </div>
+              <p className="text-xs text-neutral-500">The shop owner gets an SMS with the vehicle and driver.</p>
+            </>
+          ) : (
+            <>
+              <div>
+                <Label>Delivered at</Label>
+                <Input
+                  type="datetime-local"
+                  value={deliveredAt}
+                  max={localInputValue(new Date())}
+                  onChange={(e) => setDeliveredAt(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label hint="optional">Remark</Label>
+                <Input value={deliveryNote} onChange={(e) => setDeliveryNote(e.target.value)} placeholder="Received by owner" />
+              </div>
+              <div>
+                <Label hint="optional, JPEG or PNG">Photo of the signed slip</Label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-neutral-600 file:mr-3 file:rounded-md file:border file:border-neutral-300 file:bg-white file:px-3 file:py-1.5 file:text-[13px] file:font-medium"
+                />
+              </div>
+            </>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-neutral-200 px-5 py-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+          <Button type="submit" disabled={busy}>
+            {busy ? "Saving…" : to === "dispatched" ? "Dispatch" : "Mark delivered"}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// "2026-11-07T18:30" in the browser's time zone, for datetime-local inputs.
+function localInputValue(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Prints the order copy PDF straight from the list, without opening a tab.
+function PrintButton({ orderId }: { orderId: string }) {
+  const [busy, setBusy] = useState(false);
+  async function print() {
+    setBusy(true);
+    try {
+      const blob = await apiBlob(`/api/orders/${orderId}/pdf`);
+      const url = URL.createObjectURL(blob);
+      const frame = document.createElement("iframe");
+      frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+      frame.src = url;
+      frame.onload = () => {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+        // Long enough for the print dialog to have read the document.
+        setTimeout(() => {
+          frame.remove();
+          URL.revokeObjectURL(url);
+        }, 60_000);
+      };
+      document.body.appendChild(frame);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Button size="sm" variant="ghost" onClick={print} disabled={busy} title="Print order copy" aria-label="Print order copy">
+      <Printer className="h-4 w-4" />
+    </Button>
+  );
+}
+
+function DeliveryPhoto({ orderId }: { orderId: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let url: string | null = null;
+    let live = true;
+    apiBlob(`/api/orders/${orderId}/delivery-proof`)
+      .then((blob) => {
+        url = URL.createObjectURL(blob);
+        if (live) setSrc(url);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [orderId]);
+  if (!src) return <span className="text-neutral-400">Loading…</span>;
+  return (
+    <a href={src} target="_blank" rel="noreferrer">
+      <img src={src} alt="Delivery slip" className="max-h-40 rounded border border-neutral-200" />
+    </a>
   );
 }
