@@ -19,13 +19,25 @@ enum DutyEndReason {
   manual
   timeout
   deactivated
+  // The 9 pm end of the working day (DUTY_DAY_END_HOUR env, IST).
+  day_end
 }
 
 enum OrderStatus {
   pending
   confirmed
+  dispatched
   delivered
   cancelled
+}
+
+// How the shop paid during a visit.
+enum PaymentMode {
+  cash
+  upi
+  cheque
+  bank_transfer
+  credit
 }
 
 // Taken standing in the shop, or over the phone without a visit.
@@ -98,6 +110,10 @@ model Store {
   status          StoreStatus @default(approved)
   // When the owner read back the SMS code sent to phone, proving it is theirs.
   phoneVerifiedAt DateTime?
+  // The shop's GSTIN, checked for format and check digit (lib/gstin.ts).
+  gstin           String?
+  // When the salesperson should come back, set at visit checkout.
+  nextVisitOn     DateTime?   @db.Date
   createdById     String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -191,6 +207,26 @@ model Product {
 
   variants   ProductVariant[]
   orderItems OrderItem[]
+  shades     ProductShade[]
+}
+
+// A colour of a product, picked after the product code on an order line.
+// Kept by the super admin; code is the shade card number ("2041").
+model ProductShade {
+  id        String   @id @default(cuid())
+  productId String
+  name      String
+  code      String?
+  // Swatch colour for the app and dashboard, #rrggbb.
+  hex       String?
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@unique([productId, name])
 }
 
 model ProductVariant {
@@ -231,14 +267,28 @@ model Order {
   // the salesperson was really there.
   storeId            String?
   distanceFromStoreM Int?
+  // The shop's GSTIN on this order (checked format), billed against.
+  gstin              String?
+  // The visit the salesperson was checked in to when they took the order.
+  visitId            String?
+  // Supply and delivery, filled in by the office as the order moves on.
+  confirmedAt        DateTime?
+  dispatchedAt       DateTime?
+  vehicleNo          String?
+  driverName         String?
+  driverPhone        String?
+  deliveredAt        DateTime?
+  deliveryNote       String?
   createdAt          DateTime     @default(now())
 
-  store     Store?          @relation(fields: [storeId], references: [id], onDelete: SetNull)
-  employee  User            @relation(fields: [employeeId], references: [id])
-  district  District        @relation(fields: [districtId], references: [id])
-  plant     Plant           @relation(fields: [plantId], references: [id])
-  items     OrderItem[]
-  voiceNote OrderVoiceNote?
+  store         Store?              @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  employee      User                @relation(fields: [employeeId], references: [id])
+  district      District            @relation(fields: [districtId], references: [id])
+  plant         Plant               @relation(fields: [plantId], references: [id])
+  items         OrderItem[]
+  voiceNote     OrderVoiceNote?
+  deliveryProof OrderDeliveryProof?
+  visit         Visit?              @relation(fields: [visitId], references: [id], onDelete: SetNull)
 
   @@index([employeeId, createdAt])
   @@index([districtId, createdAt])
@@ -258,14 +308,30 @@ model OrderItem {
   customSize String?
   quantity   Int
   unitPrice  Decimal @db.Decimal(12, 2)
+  // The colour picked after the product: a shade from the list, its name
+  // copied so a renamed or removed shade leaves old orders readable.
+  shadeId    String?
+  shadeName  String?
 
   order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shade   ProductShade?   @relation(fields: [shadeId], references: [id], onDelete: SetNull)
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
   product Product?        @relation(fields: [productId], references: [id], onDelete: Restrict)
 }
 
 // The customer's request recorded at the shop, for the office to listen to.
 // Kept in the database (a minute is ~250 KB) so the backups cover it.
+// Photo of the signed delivery slip or the goods at the shop, uploaded by the
+// office when the order is marked delivered.
+model OrderDeliveryProof {
+  orderId   String   @id
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
 model OrderVoiceNote {
   orderId    String   @id
   mimeType   String
@@ -277,26 +343,35 @@ model OrderVoiceNote {
 }
 
 model Visit {
-  id          String    @id @default(cuid())
-  employeeId  String
-  districtId  String
-  plantId     String
-  shopName    String
-  checkInAt   DateTime  @default(now())
-  checkInLat  Float
-  checkInLng  Float
-  checkOutAt  DateTime?
-  checkOutLat Float?
-  checkOutLng Float?
-  notes       String?
+  id            String       @id @default(cuid())
+  employeeId    String
+  districtId    String
+  plantId       String
+  shopName      String
+  checkInAt     DateTime     @default(now())
+  checkInLat    Float
+  checkInLng    Float
+  checkOutAt    DateTime?
+  checkOutLat   Float?
+  checkOutLng   Float?
+  notes         String?
   // The shop on the map, when the visit was checked in to one: its owner is
   // told how the visit went.
-  storeId     String?
+  storeId       String?
+  // Collected at checkout: what the shop paid, how, and the cheque/UTR number.
+  paymentAmount Decimal?     @db.Decimal(12, 2)
+  paymentMode   PaymentMode?
+  paymentRef    String?
+  // When to come back, copied onto the shop.
+  nextVisitOn   DateTime?    @db.Date
+  // The salesperson's choice at checkout to send the owner the visit SMS.
+  notifyOwner   Boolean      @default(true)
 
   employee User     @relation(fields: [employeeId], references: [id])
   district District @relation(fields: [districtId], references: [id])
   plant    Plant    @relation(fields: [plantId], references: [id])
   store    Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  orders   Order[]
 
   @@index([employeeId, checkInAt])
   @@index([plantId, checkInAt])

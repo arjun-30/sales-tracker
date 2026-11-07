@@ -17,6 +17,8 @@ export default defineConfig({
       JWT_ACCESS_SECRET: "test-access-secret",
       JWT_REFRESH_SECRET: "test-refresh-secret",
       DISABLE_RATE_LIMIT: "1",
+      // Midnight: duty never ends mid-test, whatever the clock says.
+      DUTY_DAY_END_HOUR: "24",
     },
   },
 });

@@ -9,13 +9,24 @@ import { prisma } from "../db";
 // a document. With no provider set up, messages are only logged: the app and
 // the test suite work without an account.
 
-export type SmsKind = "store_otp" | "order_owner" | "order_admin" | "visit_owner" | "visit_admin";
+export type SmsKind =
+  | "store_otp"
+  | "order_owner"
+  | "order_admin"
+  | "order_confirmed_owner"
+  | "order_dispatched_owner"
+  | "visit_owner"
+  | "visit_admin"
+  | "payment_owner";
 
 // The env var holding each kind's MSG91 template id.
 const SMS_TEMPLATE_ENV: Record<SmsKind, string> = {
   store_otp: "MSG91_TEMPLATE_STORE_OTP",
   order_owner: "MSG91_TEMPLATE_ORDER_OWNER",
   order_admin: "MSG91_TEMPLATE_ORDER_ADMIN",
+  order_confirmed_owner: "MSG91_TEMPLATE_ORDER_CONFIRMED",
+  order_dispatched_owner: "MSG91_TEMPLATE_ORDER_DISPATCHED",
+  payment_owner: "MSG91_TEMPLATE_PAYMENT_OWNER",
   visit_owner: "MSG91_TEMPLATE_VISIT_OWNER",
   visit_admin: "MSG91_TEMPLATE_VISIT_ADMIN",
 };

@@ -5,6 +5,7 @@ import { requireAdmin, requireAuth, requireRole } from "../middleware/auth";
 import { emitToAdmins } from "../socket";
 import { plantFilter } from "../lib/scope";
 import { closeDuty, startDutySession } from "../lib/duty";
+import { dayEndLabel, pastDayEnd } from "../lib/dutySweep";
 import { istStartOfDay, totalMinutes, workedByDay } from "../lib/attendance";
 import { distanceM } from "../lib/geo";
 
@@ -106,6 +107,11 @@ trackingRouter.post("/duty", requireRole("sales_employee"), async (req, res) => 
   const me = await prisma.user.findUnique({ where: { id: userId }, select: { employeeCode: true } });
   if (me?.employeeCode && normalizeCode(me.employeeCode) !== normalizeCode(employeeCode)) {
     return res.status(403).json({ error: "That isn't your employee code. Check it on your ID or ask the office." });
+  }
+  // Duty ends for everyone at 9 pm (the sweep switches them off), so a new
+  // shift can't start between then and midnight.
+  if (onDuty && pastDayEnd()) {
+    return res.status(409).json({ error: `Duty ends at ${dayEndLabel()}. Start duty again tomorrow.` });
   }
 
   // The on/off flag and the duty session that hours are counted from change

@@ -1,5 +1,6 @@
 import { Router, type Request } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { requireAdmin, requireAuth, requireSuperAdmin } from "../middleware/auth";
 import { plantPriceMap, withPlantPrice } from "../lib/prices";
@@ -27,6 +28,10 @@ productsRouter.get("/", async (req, res) => {
           where: includeInactiveVariants ? {} : { active: true },
           orderBy: { sortOrder: "asc" },
         },
+        shades: {
+          where: includeInactiveVariants ? {} : { active: true },
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        },
       },
     }),
     plantPriceMap(pricePlantId(req)),
@@ -40,7 +45,10 @@ productsRouter.get("/lookup/:code", async (req, res) => {
   const code = req.params.code.trim().toUpperCase();
   const product = await prisma.product.findFirst({
     where: { shortCode: { equals: code, mode: "insensitive" }, active: true },
-    include: { variants: { where: { active: true }, orderBy: { sortOrder: "asc" } } },
+    include: {
+      variants: { where: { active: true }, orderBy: { sortOrder: "asc" } },
+      shades: { where: { active: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] },
+    },
   });
   if (!product) return res.status(404).json({ error: "No product with that code" });
   const prices = await plantPriceMap(pricePlantId(req));
@@ -147,4 +155,58 @@ productsRouter.put("/variants/:variantId/plant-price", requireAdmin, async (req,
     });
   }
   res.json({ variant: withPlantPrice(variant, await plantPriceMap(plantId)) });
+});
+
+// Shades: the colours of a product, picked on the order line after the code.
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const shadeSchema = z.object({
+  name: z.string().trim().min(1, "Enter the shade name").max(100),
+  code: z
+    .string()
+    .trim()
+    .max(30)
+    .optional()
+    .nullable()
+    .transform((v) => v || null),
+  hex: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .transform((v) => v || null)
+    .refine((v) => v === null || HEX.test(v), "Colour must look like #e8dcc4"),
+  sortOrder: z.number().int().optional(),
+});
+
+function shadeTaken(err: unknown) {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+}
+
+productsRouter.post("/:id/shades", requireSuperAdmin, async (req, res) => {
+  const parsed = shadeSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid shade" });
+  const product = await prisma.product.findUnique({ where: { id: req.params.id }, select: { id: true } });
+  if (!product) return res.status(404).json({ error: "Product not found" });
+  try {
+    const shade = await prisma.productShade.create({ data: { productId: product.id, ...parsed.data } });
+    res.status(201).json({ shade });
+  } catch (err) {
+    if (shadeTaken(err)) return res.status(409).json({ error: "This product already has a shade with that name" });
+    throw err;
+  }
+});
+
+productsRouter.patch("/shades/:shadeId", requireSuperAdmin, async (req, res) => {
+  const parsed = shadeSchema.partial().extend({ active: z.boolean().optional() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid shade" });
+  const existing = await prisma.productShade.findUnique({ where: { id: req.params.shadeId } });
+  if (!existing) return res.status(404).json({ error: "Shade not found" });
+  try {
+    // Switching a shade off keeps it on old orders; it just can't be picked.
+    const shade = await prisma.productShade.update({ where: { id: existing.id }, data: parsed.data });
+    res.json({ shade });
+  } catch (err) {
+    if (shadeTaken(err)) return res.status(409).json({ error: "This product already has a shade with that name" });
+    throw err;
+  }
 });

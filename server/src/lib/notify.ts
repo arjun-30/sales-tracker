@@ -89,7 +89,8 @@ export async function notifyVisitEnded(visitId: string) {
   const context = { plantId: visit.plantId, visitId: visit.id };
   const sends: Promise<unknown>[] = [];
   const owner = (visit.store.phone ?? "").replace(/\D/g, "").slice(-10);
-  if (owner.length === 10) {
+  // The salesperson can choose at checkout not to message the owner.
+  if (owner.length === 10 && visit.notifyOwner) {
     sends.push(
       sendSms({
         ...context,
@@ -112,4 +113,79 @@ export async function notifyVisitEnded(visitId: string) {
     );
   }
   await Promise.all(sends);
+}
+
+async function orderForMessage(orderId: string) {
+  return prisma.order.findUnique({
+    where: { id: orderId },
+    include: { store: { select: { name: true, phone: true } } },
+  });
+}
+
+// The office confirmed the order: the owner gets a thank-you with the
+// reference, so they know it is being supplied.
+export async function notifyOrderConfirmed(orderId: string) {
+  const order = await orderForMessage(orderId);
+  const owner = order && ownerPhone(order);
+  if (!order || !owner) return;
+  const ref = orderRef(order.id);
+  const shop = order.store?.name ?? order.shopName ?? order.customerName;
+  const total = rupees(Number(order.totalAmount));
+  await sendSms({
+    plantId: order.plantId,
+    orderId: order.id,
+    kind: "order_confirmed_owner",
+    to: owner,
+    text: `Roalux: Thank you, ${shop}. Your order ${ref} of ${total} is confirmed and will be dispatched soon.`,
+    vars: [shop, ref, total],
+  });
+}
+
+// The goods left the plant: the owner hears which vehicle and whom to call.
+export async function notifyOrderDispatched(orderId: string) {
+  const order = await orderForMessage(orderId);
+  const owner = order && ownerPhone(order);
+  if (!order || !owner) return;
+  const ref = orderRef(order.id);
+  const vehicle = order.vehicleNo ?? "our vehicle";
+  const driver = [order.driverName, order.driverPhone].filter(Boolean).join(" ") || "the office";
+  await sendSms({
+    plantId: order.plantId,
+    orderId: order.id,
+    kind: "order_dispatched_owner",
+    to: owner,
+    text: `Roalux: Your order ${ref} has been dispatched in ${vehicle}. Driver: ${driver}. Thank you.`,
+    vars: [ref, vehicle, driver],
+  });
+}
+
+const PAYMENT_MODE_LABEL: Record<string, string> = {
+  cash: "cash",
+  upi: "UPI",
+  cheque: "cheque",
+  bank_transfer: "bank transfer",
+  credit: "credit",
+};
+
+// Payment recorded at checkout: the owner gets a receipt by SMS. Credit is
+// not money received, so it sends nothing.
+export async function notifyPaymentReceived(visitId: string) {
+  const visit = await prisma.visit.findUnique({
+    where: { id: visitId },
+    include: { store: { select: { name: true, phone: true } }, employee: { select: { name: true } } },
+  });
+  if (!visit?.store || !visit.notifyOwner) return;
+  if (!visit.paymentAmount || !visit.paymentMode || visit.paymentMode === "credit") return;
+  const owner = (visit.store.phone ?? "").replace(/\D/g, "").slice(-10);
+  if (owner.length !== 10) return;
+  const amount = rupees(Number(visit.paymentAmount));
+  const mode = PAYMENT_MODE_LABEL[visit.paymentMode] + (visit.paymentRef ? ` (${visit.paymentRef})` : "");
+  await sendSms({
+    plantId: visit.plantId,
+    visitId: visit.id,
+    kind: "payment_owner",
+    to: owner,
+    text: `Roalux: Received ${amount} by ${mode} from ${visit.store.name}, collected by ${visit.employee.name}. Thank you.`,
+    vars: [amount, mode, visit.store.name, visit.employee.name],
+  });
 }

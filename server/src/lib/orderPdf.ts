@@ -23,6 +23,9 @@ const titleCase = (name: string) =>
     .trim()
     .replace(/(^|[\s(])([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
 
+const shortDate = (d: Date) =>
+  d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+
 export async function loadOrderForPdf(orderId: string) {
   return prisma.order.findUnique({
     where: { id: orderId },
@@ -79,6 +82,7 @@ export function orderPdf(order: PdfOrder): Promise<Buffer> {
       order.store?.ownerName ?? order.customerName,
       order.store?.phone ?? order.customerPhone,
       order.store?.address,
+      order.gstin ? `GSTIN ${order.gstin}` : null,
     ].filter((l): l is string => !!l && l !== shopName);
     const half = width / 2 - 10;
     const top = 120;
@@ -109,7 +113,10 @@ export function orderPdf(order: PdfOrder): Promise<Buffer> {
 
     doc.font("Helvetica").fontSize(10);
     for (const i of order.items) {
-      const name = titleCase(i.variant?.product.name ?? i.product?.name ?? i.customName ?? "Custom item");
+      const product = titleCase(i.variant?.product.name ?? i.product?.name ?? i.customName ?? "Custom item");
+      // The colour goes under the product, as the plant mixes by it.
+      const name = i.shadeName ? `${product}
+Shade: ${i.shadeName}` : product;
       const size = i.variant?.sizeLabel === "STD" ? "Standard" : (i.variant?.sizeLabel ?? i.customSize ?? "");
       const rate = Number(i.unitPrice);
       const nameHeight = doc.heightOfString(name, { width: cols.size - cols.item - 16 });
@@ -133,6 +140,20 @@ export function orderPdf(order: PdfOrder): Promise<Buffer> {
     doc.text("Total", cols.qty - 40, y, { width: cols.rate - cols.qty + 32, align: "right" });
     doc.text(rupees(Number(order.totalAmount)), cols.rate, y, { width: right - cols.rate - 8, align: "right" });
     y += 30;
+
+    // Once it has left the plant: the vehicle, driver and delivery.
+    const delivery = [
+      order.dispatchedAt ? `Dispatched ${shortDate(order.dispatchedAt)}` : null,
+      order.vehicleNo ? `Vehicle ${order.vehicleNo}` : null,
+      order.driverName || order.driverPhone ? `Driver ${[order.driverName, order.driverPhone].filter(Boolean).join(", ")}` : null,
+      order.deliveredAt ? `Delivered ${shortDate(order.deliveredAt)}` : null,
+      order.deliveryNote,
+    ].filter(Boolean);
+    if (delivery.length > 0) {
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(MUTED).text("SUPPLY AND DELIVERY", left, y);
+      doc.font("Helvetica").fontSize(10).fillColor("#000").text(delivery.join("   |   "), left, y + 14, { width });
+      y = doc.y + 16;
+    }
 
     if (order.notes) {
       doc.font("Helvetica-Bold").fontSize(9).fillColor(MUTED).text("NOTES", left, y);

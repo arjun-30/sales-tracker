@@ -1,5 +1,6 @@
 import { Router, type Request } from "express";
 import { z } from "zod";
+import { gstinProblem, normalizeGstin } from "../lib/gstin";
 import { prisma } from "../db";
 import { requireAdmin, requireAuth, requireRole } from "../middleware/auth";
 import { plantFilter, targetPlantId } from "../lib/scope";
@@ -75,6 +76,16 @@ const storeSchema = z.object({
     .refine((v) => v === null || /^\d{10}$/.test(v), "Phone number must be exactly 10 digits"),
   address: optionalText,
   notes: optionalText,
+  // Optional; when given it must pass the GSTIN layout and check digit.
+  gstin: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((v) => (v ? normalizeGstin(v) : null))
+    .superRefine((v, ctx) => {
+      const problem = v && gstinProblem(v);
+      if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+    }),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   plantId: z.string().optional(),

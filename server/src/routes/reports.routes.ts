@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import { plantFilter } from "../lib/scope";
+import { istDateKey, workedByDay } from "../lib/attendance";
 
 export const reportsRouter = Router();
 
@@ -284,3 +285,74 @@ async function comparePlants(salesWhere: Record<string, unknown>, visitWhere: Re
     }))
     .sort((a, b) => b.totalSales - a.totalSales);
 }
+
+// Staff attendance for a month: every salesperson of the plant, with the
+// minutes on duty, first on and last off for each IST day. A day is "present"
+// with at least FULL_DAY_MINUTES on duty, "half" with less, "absent" with none.
+const FULL_DAY_MINUTES = 4 * 60;
+const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+const monthSchema = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "month looks like 2026-11"),
+  plantId: z.string().optional(),
+});
+
+reportsRouter.get("/attendance", async (req, res) => {
+  const parsed = monthSchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid month" });
+  const [y, m] = parsed.data.month.split("-").map(Number);
+  const from = new Date(Date.UTC(y, m - 1, 1) - IST_OFFSET_MS);
+  const monthEnd = new Date(Date.UTC(y, m, 1) - IST_OFFSET_MS);
+  const now = new Date();
+  const to = monthEnd < now ? monthEnd : now;
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const dates = Array.from({ length: daysInMonth }, (_, i) => `${parsed.data.month}-${String(i + 1).padStart(2, "0")}`);
+
+  const employees = await prisma.user.findMany({
+    where: { role: "sales_employee", ...plantFilter(req) },
+    select: {
+      id: true,
+      name: true,
+      employeeCode: true,
+      active: true,
+      plant: { select: { code: true } },
+      dutySessions: {
+        where: { startedAt: { lt: to }, OR: [{ endedAt: null }, { endedAt: { gt: from } }] },
+        select: { startedAt: true, endedAt: true, endReason: true },
+      },
+    },
+    orderBy: [{ employeeCode: "asc" }, { name: "asc" }],
+  });
+
+  const rows = employees
+    .map((e) => {
+      const worked = from < to ? workedByDay(e.dutySessions, from, to, now) : [];
+      const byDate = new Map(worked.map((d) => [d.date, d]));
+      // Days the sweep closed at 9 pm: the salesperson never pressed off duty.
+      const autoEnded = new Set(
+        e.dutySessions.filter((s) => s.endReason === "day_end" && s.endedAt).map((s) => istDateKey(s.endedAt!))
+      );
+      const days = dates.map((date) => {
+        const d = byDate.get(date);
+        const minutes = d?.minutes ?? 0;
+        return {
+          date,
+          minutes,
+          firstOn: d?.firstOn ?? null,
+          lastOff: d?.lastOff ?? null,
+          status: minutes >= FULL_DAY_MINUTES ? "present" : minutes > 0 ? "half" : "absent",
+          autoEnded: autoEnded.has(date),
+        };
+      });
+      return {
+        employee: { id: e.id, name: e.name, employeeCode: e.employeeCode, active: e.active, plantCode: e.plant?.code ?? null },
+        days,
+        present: days.filter((d) => d.status === "present").length,
+        half: days.filter((d) => d.status === "half").length,
+        totalMinutes: days.reduce((s, d) => s + d.minutes, 0),
+      };
+    })
+    // Deactivated staff stay on the sheet only for months they worked.
+    .filter((r) => r.employee.active || r.totalMinutes > 0);
+
+  res.json({ month: parsed.data.month, dates, fullDayMinutes: FULL_DAY_MINUTES, today: istDateKey(now), rows });
+});
