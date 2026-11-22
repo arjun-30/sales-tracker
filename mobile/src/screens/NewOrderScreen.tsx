@@ -22,6 +22,7 @@ import { getCurrentPosition } from "../lib/locationTask";
 import { distanceKm, formatKm, type LatLng } from "../lib/geo";
 import type { Order, Product, ProductShade, Store, Visit } from "../lib/types";
 import { gstinProblem, normalizeGstin } from "../lib/gstin";
+import { useGstinCheck } from "../lib/useGstinCheck";
 import type { RootStackParamList } from "../navigation/types";
 import { Button, Card, Field } from "../components/ui";
 import { VOICE_NOTE_MIME, VoiceRecorder, type RecordedNote } from "../components/VoiceNote";
@@ -81,6 +82,7 @@ export default function NewOrderScreen() {
   // The colour picked for the product on screen, when it has shades.
   const [shade, setShade] = useState<ProductShade | null>(null);
   const [gstin, setGstin] = useState("");
+  const gstinCheck = useGstinCheck(gstin);
   // Checked in at a shop: the order is that shop's, and can't be changed here.
   const [visit, setVisit] = useState<Visit | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -260,7 +262,8 @@ export default function NewOrderScreen() {
       Alert.alert("No products yet", "Add at least one product to the order.");
       return;
     }
-    const gstinError = gstinProblem(gstin);
+    const gstinError =
+      gstinProblem(gstin) ?? (gstinCheck.state === "done" && gstinCheck.verdict.result === "invalid" ? gstinCheck.verdict.problem : null);
     if (gstinError) {
       Alert.alert("Check the GSTIN", gstinError);
       return;
@@ -424,13 +427,7 @@ export default function NewOrderScreen() {
                 value={gstin}
                 onChangeText={(t) => setGstin(normalizeGstin(t))}
               />
-              {gstin ? (
-                gstinProblem(gstin) ? (
-                  <Text style={styles.gstinBad}>{gstinProblem(gstin)}</Text>
-                ) : (
-                  <Text style={styles.gstinOk}>GSTIN looks right</Text>
-                )
-              ) : null}
+              <GstinStatus check={gstinCheck} />
             </View>
             <Field label="Notes (optional)" placeholder="Delivery date, credit terms…" value={notes} onChangeText={setNotes} />
             <VoiceRecorder value={voiceNote} onChange={setVoiceNote} />
@@ -775,6 +772,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   checkedIn: { fontSize: 13, fontWeight: "700", color: colors.success },
+  gstinRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  gstinDetail: { fontSize: 12, color: colors.textMuted },
   gstinBad: { fontSize: 12, color: colors.danger, fontWeight: "600" },
   gstinOk: { fontSize: 12, color: colors.success, fontWeight: "600" },
   shadeBlock: { paddingVertical: 8, gap: 2 },
@@ -836,3 +835,41 @@ const styles = StyleSheet.create({
   footerLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
   footerTotal: { fontSize: 22, fontWeight: "700", color: colors.text },
 });
+
+// Under the GSTIN field: a typing mistake, the online check running, the
+// business the GST portal has for the number, or why it can't be used.
+function GstinStatus({ check }: { check: ReturnType<typeof useGstinCheck> }) {
+  if (check.state === "empty") return null;
+  if (check.state === "typing") return <Text style={styles.gstinBad}>{check.problem}</Text>;
+  if (check.state === "checking") {
+    return (
+      <View style={styles.gstinRow}>
+        <ActivityIndicator size="small" color={colors.textMuted} />
+        <Text style={styles.gstinDetail}>Checking on the GST portal…</Text>
+      </View>
+    );
+  }
+  const v = check.verdict;
+  if (v.result === "invalid") return <Text style={styles.gstinBad}>{v.problem}</Text>;
+  if (v.result === "unchecked") {
+    return (
+      <View style={{ gap: 2 }}>
+        <Text style={styles.gstinOk}>GSTIN format is right</Text>
+        <Text style={styles.gstinDetail}>{v.reason}</Text>
+      </View>
+    );
+  }
+  const trade = v.tradeName && v.tradeName !== v.legalName ? v.tradeName : null;
+  return (
+    <View style={{ gap: 2 }}>
+      <View style={styles.gstinRow}>
+        <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+        <Text style={styles.gstinOk}>
+          {v.status}: {v.legalName ?? v.tradeName}
+        </Text>
+      </View>
+      {trade ? <Text style={styles.gstinDetail}>Trade name: {trade}</Text> : null}
+      {v.address ? <Text style={styles.gstinDetail}>{v.address}</Text> : null}
+    </View>
+  );
+}

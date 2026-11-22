@@ -37,8 +37,13 @@ export interface Store {
   status: "pending" | "approved";
   // When the owner read back the SMS code sent to the number.
   phoneVerifiedAt: string | null;
-  // Checked for layout and check digit by the server.
+  // Checked for layout and check digit by the server and, when the online
+  // check is set up, on the GST portal: the registered name and status it
+  // gave (null when not checked online).
   gstin: string | null;
+  gstinName: string | null;
+  gstinStatus: string | null;
+  gstinCheckedAt: string | null;
   // YYYY-MM-DD (as an ISO date at midnight UTC), set at visit checkout.
   nextVisitOn: string | null;
   createdAt: string;
@@ -172,6 +177,9 @@ export interface Order {
   storeId: string | null;
   distanceFromStoreM: number | null;
   gstin: string | null;
+  // What the GST portal said when the order was taken; null when not checked online.
+  gstinName: string | null;
+  gstinStatus: string | null;
   visitId: string | null;
   confirmedAt: string | null;
   dispatchedAt: string | null;
@@ -317,3 +325,17 @@ export interface MonthlyAttendance {
     totalMinutes: number;
   }[];
 }
+
+// The server's answer for a GSTIN (GET /api/gstin/:gstin).
+export type GstinVerdict =
+  | { result: "invalid"; gstin: string; problem: string; status?: string | null; legalName?: string | null }
+  | {
+      result: "verified";
+      gstin: string;
+      status: string;
+      legalName: string | null;
+      tradeName: string | null;
+      address: string | null;
+      state: string | null;
+    }
+  | { result: "unchecked"; gstin: string; reason: string };

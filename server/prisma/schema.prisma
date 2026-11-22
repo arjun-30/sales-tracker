@@ -110,8 +110,14 @@ model Store {
   status          StoreStatus @default(approved)
   // When the owner read back the SMS code sent to phone, proving it is theirs.
   phoneVerifiedAt DateTime?
-  // The shop's GSTIN, checked for format and check digit (lib/gstin.ts).
+  // The shop's GSTIN, checked for format and check digit (lib/gstin.ts) and,
+  // when the online check is set up, on the GST portal (lib/gstVerify.ts).
   gstin           String?
+  // The registered name and portal status from that online check; null when
+  // the number was not checked online.
+  gstinName       String?
+  gstinStatus     String?
+  gstinCheckedAt  DateTime?
   // When the salesperson should come back, set at visit checkout.
   nextVisitOn     DateTime?   @db.Date
   createdById     String?
@@ -267,8 +273,11 @@ model Order {
   // the salesperson was really there.
   storeId            String?
   distanceFromStoreM Int?
-  // The shop's GSTIN on this order (checked format), billed against.
+  // The shop's GSTIN on this order, billed against. gstinName/gstinStatus are
+  // what the GST portal said when the order was taken (null: not checked online).
   gstin              String?
+  gstinName          String?
+  gstinStatus        String?
   // The visit the salesperson was checked in to when they took the order.
   visitId            String?
   // Supply and delivery, filled in by the office as the order moves on.
@@ -423,4 +432,21 @@ model OutboundMessage {
 
   @@index([plantId, createdAt])
   @@index([kind, createdAt])
+}
+
+// Answers from the GST portal (through Sandbox), one row per GSTIN, so each
+// number is paid for once and re-checked only after GST_CHECK_DAYS.
+model GstinCheck {
+  gstin        String   @id
+  // false: the portal has no such registration.
+  found        Boolean
+  // As the portal says it: Active, Cancelled, Suspended, Inactive, Provisional.
+  status       String?
+  legalName    String?
+  tradeName    String?
+  address      String?
+  state        String?
+  registeredOn String?
+  cancelledOn  String?
+  checkedAt    DateTime
 }

@@ -82,7 +82,7 @@ export function orderPdf(order: PdfOrder): Promise<Buffer> {
       order.store?.ownerName ?? order.customerName,
       order.store?.phone ?? order.customerPhone,
       order.store?.address,
-      order.gstin ? `GSTIN ${order.gstin}` : null,
+      order.gstin ? `GSTIN ${order.gstin}${order.gstinName ? ` (${order.gstinName})` : ""}` : null,
     ].filter((l): l is string => !!l && l !== shopName);
     const half = width / 2 - 10;
     const top = 120;

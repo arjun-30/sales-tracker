@@ -33,3 +33,15 @@ export const loginPerIpLimiter = rateLimit({
   keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? ""),
   message: tooMany,
 });
+
+// Online GSTIN checks cost money per lookup (answers are kept, so a repeat is
+// free): 60 lookups per user per 15 minutes is far more than typing needs.
+export const gstinLookupLimiter = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  limit: 60,
+  skip,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => `gstin:${req.user?.sub ?? ipKeyGenerator(req.ip ?? "")}`,
+  message: { error: "Too many GSTIN checks. Wait a few minutes and try again." },
+});

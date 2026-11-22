@@ -353,7 +353,21 @@ function OrderDetail({ order, busy, onAction }: { order: Order; busy: boolean; o
         <Detail label="Order ID" value={<span className="font-mono text-xs">{order.id}</span>} />
         <Detail label="Customer phone" value={order.customerPhone || "-"} />
         <Detail label="Shop" value={order.shopName || "-"} />
-        <Detail label="GSTIN" value={order.gstin ? <span className="font-mono text-xs">{order.gstin}</span> : "-"} />
+        <Detail
+          label="GSTIN"
+          value={
+            order.gstin ? (
+              <span>
+                <span className="font-mono text-xs">{order.gstin}</span>
+                <span className="block text-xs text-neutral-500">
+                  {order.gstinStatus ? `${order.gstinStatus}: ${order.gstinName ?? ""}` : "Not checked online"}
+                </span>
+              </span>
+            ) : (
+              "-"
+            )
+          }
+        />
         <Detail label="Supply and delivery" value={<SupplyDetail order={order} />} />
         <Detail label="How it was taken" value={<HowTaken order={order} long />} />
         <Detail label="Notes" value={order.notes || "-"} />

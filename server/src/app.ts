@@ -17,6 +17,7 @@ import { plantsRouter } from "./routes/plants.routes";
 import { adminsRouter } from "./routes/admins.routes";
 import { storesRouter } from "./routes/stores.routes";
 import { messagesRouter } from "./routes/messages.routes";
+import { gstinRouter } from "./routes/gstin.routes";
 import { MulterError } from "multer";
 import { HttpError } from "./lib/scope";
 
@@ -47,6 +48,7 @@ app.use("/api/plants", plantsRouter);
 app.use("/api/admins", adminsRouter);
 app.use("/api/stores", storesRouter);
 app.use("/api/messages", messagesRouter);
+app.use("/api/gstin", gstinRouter);
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof HttpError) {

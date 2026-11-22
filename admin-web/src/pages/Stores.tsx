@@ -1,9 +1,9 @@
 import { useMemo, useEffect, useState, type FormEvent } from "react";
 import { GoogleMap, MarkerF, useJsApiLoader } from "@react-google-maps/api";
-import { Building2, CalendarPlus, FileSpreadsheet, MapPin, Phone, Plus, Search } from "lucide-react";
+import { BadgeCheck, Building2, CalendarPlus, FileSpreadsheet, Loader2, MapPin, Phone, Plus, Search } from "lucide-react";
 import { api } from "../lib/api";
 import { formatDate } from "../lib/format";
-import type { Store } from "../lib/types";
+import type { GstinVerdict, Store } from "../lib/types";
 import { usePlant } from "../context/PlantContext";
 import { Card, CardHeader, Notice, PageHeader, StatCard } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -198,13 +198,14 @@ function StoreForm({ store, onDone, onCancel }: { store: Store | null; onDone: (
             <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, area, town" />
           </div>
           <div className="sm:col-span-2">
-            <Label hint={gstin ? `${gstin.length}/15` : "Optional, checked for typing mistakes"}>GSTIN</Label>
+            <Label hint={gstin ? `${gstin.length}/15` : "Optional, checked on the GST portal"}>GSTIN</Label>
             <Input
               value={gstin}
               onChange={(e) => setGstin(e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 15))}
               placeholder="33AAACR5055K1ZE"
               className="font-mono"
             />
+            <GstinLookup gstin={gstin} onUseAddress={address ? undefined : setAddress} />
           </div>
           <div className="sm:col-span-2">
             <Label hint="Optional">Notes</Label>
@@ -484,7 +485,20 @@ export function Stores() {
                   </Td>
                   <Td className="max-w-72">
                     <div className="truncate">{s.address ?? <span className="text-neutral-400">-</span>}</div>
-                    {s.gstin ? <div className="font-mono text-xs text-neutral-500">GSTIN {s.gstin}</div> : null}
+                    {s.gstin ? (
+                      <div className="text-xs text-neutral-500">
+                        <span className="font-mono">GSTIN {s.gstin}</span>
+                        {s.gstinStatus ? (
+                          <span className={s.gstinStatus.match(/^(active|provisional)/i) ? "text-emerald-700" : "text-red-600"}>
+                            {" "}
+                            · {s.gstinStatus}
+                            {s.gstinName ? `: ${s.gstinName}` : ""}
+                          </span>
+                        ) : (
+                          <span title="The number has the right format but was not checked on the GST portal"> · not checked online</span>
+                        )}
+                      </div>
+                    ) : null}
                     <a
                       href={mapsLink(s)}
                       target="_blank"
@@ -530,4 +544,64 @@ function NextVisit({ on }: { on: string | null }) {
   if (day < today) return <span className="font-medium text-red-700">{label} · overdue</span>;
   if (day === today) return <span className="font-medium text-amber-700">Today</span>;
   return <span className="text-neutral-800">{label}</span>;
+}
+
+// Under the GSTIN field: once all 15 characters are typed, what the GST portal
+// has for the number. The server refuses to save a cancelled or unknown one.
+function GstinLookup({ gstin, onUseAddress }: { gstin: string; onUseAddress?: (address: string) => void }) {
+  const [verdict, setVerdict] = useState<GstinVerdict | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    setVerdict(null);
+    if (gstin.length !== 15) return;
+    let live = true;
+    setChecking(true);
+    const timer = setTimeout(() => {
+      api<GstinVerdict>(`/api/gstin/${gstin}`)
+        .then((v) => live && setVerdict(v))
+        .catch(() => live && setVerdict({ result: "unchecked", gstin, reason: "Could not check the number online." }))
+        .finally(() => live && setChecking(false));
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+      setChecking(false);
+    };
+  }, [gstin]);
+
+  if (gstin.length !== 15) return null;
+  if (checking || !verdict) {
+    return (
+      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-neutral-500">
+        <Loader2 className="size-3.5 animate-spin" /> Checking on the GST portal…
+      </p>
+    );
+  }
+  if (verdict.result === "invalid") return <p className="mt-1.5 text-xs font-medium text-red-600">{verdict.problem}</p>;
+  if (verdict.result === "unchecked") {
+    return <p className="mt-1.5 text-xs text-neutral-500">Format is right. {verdict.reason}</p>;
+  }
+  const trade = verdict.tradeName && verdict.tradeName !== verdict.legalName ? verdict.tradeName : null;
+  return (
+    <div className="mt-1.5 space-y-0.5 text-xs">
+      <p className="flex items-center gap-1.5 font-medium text-emerald-700">
+        <BadgeCheck className="size-3.5" /> {verdict.status}: {verdict.legalName ?? verdict.tradeName}
+      </p>
+      {trade ? <p className="text-neutral-500">Trade name: {trade}</p> : null}
+      {verdict.address ? (
+        <p className="text-neutral-500">
+          {verdict.address}
+          {onUseAddress ? (
+            <>
+              {" "}
+              <button type="button" className="font-medium text-brand-600 hover:underline" onClick={() => onUseAddress(verdict.address!)}>
+                Use as address
+              </button>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+    </div>
+  );
 }

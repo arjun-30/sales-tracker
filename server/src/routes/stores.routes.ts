@@ -1,6 +1,7 @@
 import { Router, type Request } from "express";
 import { z } from "zod";
 import { gstinProblem, normalizeGstin } from "../lib/gstin";
+import { gstinSnapshot, verifyGstin } from "../lib/gstVerify";
 import { prisma } from "../db";
 import { requireAdmin, requireAuth, requireRole } from "../middleware/auth";
 import { plantFilter, targetPlantId } from "../lib/scope";
@@ -91,14 +92,28 @@ const storeSchema = z.object({
   plantId: z.string().optional(),
 });
 
+// A shop's GSTIN is checked on the GST portal when it is set: an unregistered
+// or cancelled number is refused, and the registered name is kept with it.
+// undefined means the GSTIN is not being changed.
+type GstFields = Partial<ReturnType<typeof gstinSnapshot>>;
+async function storeGstin(gstin: string | null | undefined): Promise<{ error?: string; fields: GstFields }> {
+  if (gstin === undefined) return { fields: {} };
+  if (gstin === null) return { fields: { gstinName: null, gstinStatus: null, gstinCheckedAt: null } };
+  const verdict = await verifyGstin(gstin);
+  if (verdict.result === "invalid") return { error: verdict.problem, fields: {} };
+  return { fields: gstinSnapshot(verdict) };
+}
+
 storesRouter.post("/", requireAdmin, async (req, res) => {
   const parsed = storeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid store details" });
   }
   const { plantId: requested, ...data } = parsed.data;
+  const gst = await storeGstin(data.gstin);
+  if (gst.error) return res.status(400).json({ error: gst.error });
   const store = await prisma.store.create({
-    data: { ...data, plantId: targetPlantId(req, requested), createdById: req.user!.sub },
+    data: { ...data, ...gst.fields, plantId: targetPlantId(req, requested), createdById: req.user!.sub },
     include: storeInclude,
   });
   res.status(201).json({ store });
@@ -143,9 +158,11 @@ storesRouter.post("/from-field", requireRole("sales_employee"), async (req, res)
   }
   if (!req.user!.plantId) return res.status(400).json({ error: "Your account is not linked to a plant" });
   const { code, ...data } = parsed.data;
+  const gst = await storeGstin(data.gstin);
+  if (gst.error) return res.status(400).json({ error: gst.error });
   await useShopCode(req.user!.sub, data.phone, code);
   const store = await prisma.store.create({
-    data: { ...data, phoneVerifiedAt: new Date(), plantId: req.user!.plantId, status: "pending", createdById: req.user!.sub },
+    data: { ...data, ...gst.fields, phoneVerifiedAt: new Date(), plantId: req.user!.plantId, status: "pending", createdById: req.user!.sub },
     include: storeInclude,
   });
   emitToAdmins(store.plantId, "store:pending", { storeId: store.id, name: store.name, addedBy: store.createdBy?.name });
@@ -272,9 +289,12 @@ storesRouter.patch("/:id", requireAdmin, async (req, res) => {
   if (plantId && plantId !== existing.plantId && req.user!.role !== "super_admin") {
     return res.status(403).json({ error: "You can only manage your own plant" });
   }
+  // Re-checked only when the number changes.
+  const gst = data.gstin !== undefined && data.gstin === existing.gstin ? { fields: {} } : await storeGstin(data.gstin);
+  if (gst.error) return res.status(400).json({ error: gst.error });
   const store = await prisma.store.update({
     where: { id: existing.id },
-    data: { ...data, ...(plantId ? { plantId } : {}) },
+    data: { ...data, ...gst.fields, ...(plantId ? { plantId } : {}) },
     include: storeInclude,
   });
   res.json({ store });

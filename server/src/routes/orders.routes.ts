@@ -10,6 +10,7 @@ import { distanceM } from "../lib/geo";
 import { inBackground } from "../lib/messaging";
 import { notifyOrderConfirmed, notifyOrderDispatched, notifyOrderTaken } from "../lib/notify";
 import { gstinProblem, normalizeGstin } from "../lib/gstin";
+import { gstinSnapshot, verifyGstin } from "../lib/gstVerify";
 import { loadOrderForPdf, orderPdf, orderRef } from "../lib/orderPdf";
 
 export const ordersRouter = Router();
@@ -154,8 +155,14 @@ ordersRouter.post("/", requireRole("sales_employee"), voiceUpload.single("voiceN
       })
     : null;
   if (storeId && !store) return res.status(400).json({ error: "That shop is not on your plant's map" });
-  // The shop's GSTIN is used when the salesperson doesn't type one.
+  // The shop's GSTIN is used when the salesperson doesn't type one. It is
+  // checked on the GST portal (a kept answer when it was checked recently):
+  // an unregistered or cancelled number stops the order; a portal outage
+  // doesn't.
   const gstin = gstinInput ?? store?.gstin ?? null;
+  const gstinVerdict = gstin ? await verifyGstin(gstin) : null;
+  if (gstinVerdict?.result === "invalid") return res.status(400).json({ error: gstinVerdict.problem });
+  const gstinFields = gstinVerdict ? gstinSnapshot(gstinVerdict) : null;
 
   // Shades must belong to the line's product and still be offered.
   const shadeIds = [...new Set(items.flatMap((i) => ("shadeId" in i && i.shadeId ? [i.shadeId] : [])))];
@@ -254,6 +261,8 @@ ordersRouter.post("/", requireRole("sales_employee"), voiceUpload.single("voiceN
       storeId: store?.id,
       visitId: openVisit?.id,
       gstin,
+      gstinName: gstinFields?.gstinName ?? null,
+      gstinStatus: gstinFields?.gstinStatus ?? null,
       distanceFromStoreM,
       totalAmount,
       items: { create: orderItems },
@@ -264,9 +273,10 @@ ordersRouter.post("/", requireRole("sales_employee"), voiceUpload.single("voiceN
     include: orderInclude,
   });
 
-  // A GSTIN first given on an order is kept on the shop for next time.
-  if (store && gstinInput && !store.gstin) {
-    await prisma.store.update({ where: { id: store.id }, data: { gstin: gstinInput } });
+  // A GSTIN first given on an order is kept on the shop for next time, and
+  // the shop's copy of the portal's answer is brought up to date.
+  if (store && gstin && gstinFields && (!store.gstin || (store.gstin === gstin && gstinVerdict?.result === "verified"))) {
+    await prisma.store.update({ where: { id: store.id }, data: { gstin, ...gstinFields } });
   }
 
   res.status(201).json({ order });
