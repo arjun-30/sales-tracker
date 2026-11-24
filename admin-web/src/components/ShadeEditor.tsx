@@ -99,8 +99,13 @@ export function ShadeEditor({
           <div className="w-56">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Shade name, e.g. Ivory" />
           </div>
-          <div className="w-28">
-            <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Card no." />
+          <div className="w-44">
+            <Input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="Shade code, e.g. 2041"
+              title="The number printed next to this colour on the shade card"
+            />
           </div>
           <input
             type="color"

@@ -95,7 +95,7 @@ function PlantSwitcher() {
       <select
         value={plantId}
         onChange={(e) => selectPlant(e.target.value)}
-        className="mt-1 h-9 w-full rounded-md border border-sand-300 bg-white px-2.5 text-[13.5px] font-semibold text-sand-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
+        className="mt-1 h-9 w-full rounded-md border border-sand-300 bg-white px-2.5 text-[13.5px] font-semibold text-sand-900 outline-none focus:border-neutral-900"
       >
         <option value="">All plants</option>
         {plants.map((p) => (

@@ -93,7 +93,7 @@ export function Login() {
                   {phone.length}/{PHONE_LENGTH}
                 </span>
               </div>
-              <div className="flex h-10 overflow-hidden rounded-md border border-neutral-300 bg-white transition focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/15">
+              <div className="flex h-10 overflow-hidden rounded-md border border-neutral-300 bg-white transition focus-within:border-neutral-900">
                 <span className="flex items-center border-r border-neutral-200 bg-neutral-50 px-3 text-sm font-semibold text-neutral-700">
                   +91
                 </span>

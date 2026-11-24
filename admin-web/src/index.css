@@ -43,3 +43,23 @@ body {
   font-feature-settings: "cv11", "ss01";
 }
 
+/* Focus: a plain dark border on fields, a thin square outline on buttons and
+   links (keyboard only). No coloured glow. Unlayered so it wins over any
+   focus:ring utility left in a component. */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #171717;
+  box-shadow: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 1.5px solid #171717;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
