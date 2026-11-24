@@ -1,13 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { AlertCircle, CheckCircle2, MapPinned, Receipt, TrendingUp } from "lucide-react";
+import { AlertCircle, CheckCircle2, MapPinned, ReceiptIndianRupee, TrendingUp } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/Button";
 import { Input, Label } from "../components/ui/Input";
 
 const highlights = [
   { icon: MapPinned, title: "Live field map", text: "See every on-duty salesperson across Tamil Nadu in real time." },
-  { icon: Receipt, title: "Orders in one place", text: "Confirm, deliver or cancel orders as they come in from the field." },
+  { icon: ReceiptIndianRupee, title: "Orders in one place", text: "Confirm, deliver or cancel orders as they come in from the field." },
   { icon: TrendingUp, title: "Sales insight", text: "Track sales, visits and district coverage day by day." },
 ];
 

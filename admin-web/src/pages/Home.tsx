@@ -10,7 +10,7 @@ import {
   IndianRupee,
   MapPinned,
   MessageSquareWarning,
-  Receipt,
+  ReceiptIndianRupee,
   Store,
   Truck,
   UserCheck,
@@ -77,7 +77,7 @@ function tasks(s: TodaySummary): Task[] {
   if (w.pendingOrders)
     list.push({
       key: "pending",
-      icon: Receipt,
+      icon: ReceiptIndianRupee,
       text: `${plural(w.pendingOrders, "new order")} to confirm`,
       detail: w.oldestPendingAt ? `The oldest came in ${daysAgo(w.oldestPendingAt)}. The shop gets a thank-you SMS when you confirm.` : undefined,
       to: "/orders?tab=pending",
@@ -260,7 +260,7 @@ export function Home() {
           <StatCard
             label="Orders taken today"
             value={summary ? summary.today.orders : "-"}
-            icon={Receipt}
+            icon={ReceiptIndianRupee}
             accent
             hint={summary ? (summary.today.orders ? `Worth ${formatINR(summary.today.sales)}` : "No orders yet today") : undefined}
           />

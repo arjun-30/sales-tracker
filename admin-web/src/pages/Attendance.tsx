@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { CalendarDays, Clock, Receipt, Search, Store } from "lucide-react";
+import { CalendarDays, Clock, ReceiptIndianRupee, Search, Store } from "lucide-react";
 import { api } from "../lib/api";
 import { formatDay, formatDateTime, formatINR, formatMinutes, formatTime, timeAgo } from "../lib/format";
 import type { AttendanceReport, DutySession } from "../lib/types";
@@ -177,7 +177,7 @@ export function Attendance() {
             <StatCard
               label="Orders"
               value={report.activity.orders}
-              icon={Receipt}
+              icon={ReceiptIndianRupee}
               hint={`${formatINR(report.activity.sales)} in sales`}
             />
             <StatCard label="Shop visits" value={report.activity.visits} icon={Store} hint="Check-ins in this period" />

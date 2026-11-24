@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Clock, MapPin, Receipt, Search, Store, Timer, TrendingUp } from "lucide-react";
+import { Clock, MapPin, ReceiptIndianRupee, Search, Store, Timer, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
 import { usePlant } from "../context/PlantContext";
 import { formatDay, formatINR, formatMinutes, formatTime } from "../lib/format";
@@ -255,7 +255,7 @@ export function Visits() {
                         <Td className="whitespace-nowrap">
                           {order ? (
                             <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-emerald-700">
-                              <Receipt className="h-4 w-4" strokeWidth={2.25} />
+                              <ReceiptIndianRupee className="h-4 w-4" strokeWidth={2.25} />
                               Order {formatINR(order.totalAmount)}
                             </span>
                           ) : (

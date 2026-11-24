@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, Clock, IndianRupee, Receipt, Store, UserCheck } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CalendarDays, Clock, IndianRupee, ReceiptIndianRupee, Store, UserCheck } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
 import { displayProductName } from "../lib/format";
 import { api } from "../lib/api";
@@ -31,9 +31,11 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: "#dc2626",
 };
 
+// days: how many days before today the period starts; "month" starts on the 1st.
 const PERIODS = [
   { id: "today", label: "Today", days: 0 },
   { id: "7d", label: "Last 7 days", days: 6 },
+  { id: "month", label: "This month", days: -1 },
   { id: "30d", label: "Last 30 days", days: 29 },
   { id: "all", label: "All time", days: null },
 ] as const;
@@ -46,8 +48,27 @@ function periodStart(id: PeriodId): Date | null {
   if (period.days === null) return null;
   const d = new Date();
   d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - period.days);
+  if (period.days === -1) d.setDate(1);
+  else d.setDate(d.getDate() - period.days);
   return d;
+}
+
+// Every day from start to today, with ₹0 on days without orders, so the
+// chart shows quiet days instead of drawing a line straight across them.
+function fillDays(rows: { day: string; total: number; count: number }[], start: Date | null) {
+  const byDay = new Map(rows.map((r) => [r.day, r]));
+  const first = start ?? (rows.length ? new Date(`${rows[0].day}T00:00:00`) : new Date());
+  const d = new Date(first);
+  d.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const out: { day: string; total: number; count: number }[] = [];
+  while (d <= today && out.length < 400) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    out.push(byDay.get(key) ?? { day: key, total: 0, count: 0 });
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
 }
 
 export function Dashboard() {
@@ -120,6 +141,21 @@ export function Dashboard() {
     .filter((d) => d.ordersCount > 0 || d.visitsCount > 0)
     .slice(0, 8);
 
+  const days = fillDays(summary.ordersOverTime, periodStart(period));
+  const busiestDay = summary.ordersOverTime.reduce<{ day: string; total: number } | null>(
+    (best, r) => (!best || r.total > best.total ? r : best),
+    null
+  );
+
+  // The page in one paragraph, for someone who doesn't want to read charts.
+  const topSeller = summary.employeeLeaderboard[0];
+  const topProduct = summary.topProducts[0];
+  const topDistrict = [...summary.salesByDistrict].sort((a, b) => b.totalSales - a.totalSales)[0];
+  const sellers = summary.employeeLeaderboard.filter((e) => e.ordersCount > 0).length;
+  const periodPhrase = period === "today" ? "today" : period === "all" ? "so far" : period === "month" ? "this month" : `in the ${periodLabel}`;
+  const Period = periodPhrase[0].toUpperCase() + periodPhrase.slice(1);
+  const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en-IN")} ${n === 1 ? one : many}`;
+
   return (
     <div className={`space-y-6 transition-opacity ${loading ? "opacity-60" : ""}`}>
       <PageHeader
@@ -135,7 +171,7 @@ export function Dashboard() {
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Orders" value={summary.totalOrders.toLocaleString("en-IN")} icon={Receipt} hint="Not counting cancelled orders" />
+        <StatCard label="Orders" value={summary.totalOrders.toLocaleString("en-IN")} icon={ReceiptIndianRupee} hint="Cancelled not counted" />
         <StatCard
           label="Sales"
           value={formatCurrency(summary.totalSales)}
@@ -161,9 +197,50 @@ export function Dashboard() {
           label="On duty now"
           value={summary.activeEmployees}
           icon={UserCheck}
-          hint="Live, not filtered by date"
+          hint="Live, not by date"
         />
       </div>
+
+      <Card className="px-5 py-4">
+        <h2 className="text-[13px] font-semibold text-neutral-900">In short</h2>
+        {summary.totalOrders === 0 && summary.totalVisits === 0 ? (
+          <p className="mt-1 text-[14px] leading-relaxed text-neutral-700">
+            No orders or shop visits {periodPhrase}. Try a longer period above.
+          </p>
+        ) : (
+          <p className="mt-1 text-[14px] leading-relaxed text-neutral-700">
+            {Period},{" "}
+            {sellers ? `${plural(sellers, "salesperson", "salespeople")} took ` : "the team took "}
+            <strong className="font-semibold text-neutral-900">{plural(summary.totalOrders, "order", "orders")}</strong>
+            {hasSalesValue ? (
+              <>
+                {" "}worth <strong className="font-semibold text-neutral-900">{formatCurrency(summary.totalSales)}</strong>
+              </>
+            ) : null}{" "}
+            from {plural(summary.totalVisits, "shop visit", "shop visits")}.
+            {topSeller && topSeller.totalSales > 0 ? (
+              <>
+                {" "}<strong className="font-semibold text-neutral-900">{topSeller.name}</strong> sold the most (
+                {formatCurrency(topSeller.totalSales)}).
+              </>
+            ) : null}
+            {topProduct && topProduct.revenue > 0 ? (
+              <>
+                {" "}The best seller was <strong className="font-semibold text-neutral-900">{displayProductName(topProduct.name)}</strong>
+                {topDistrict && topDistrict.totalSales > 0 && !districtId ? (
+                  <>
+                    {" "}and <strong className="font-semibold text-neutral-900">{topDistrict.districtName}</strong> was the strongest district
+                  </>
+                ) : null}
+                .
+              </>
+            ) : null}
+            {busiestDay && busiestDay.total > 0 && period !== "today" ? (
+              <> The best day was {longDay(busiestDay.day)} ({formatCurrency(busiestDay.total)}).</>
+            ) : null}
+          </p>
+        )}
+      </Card>
 
       {summary.plantComparison && summary.plantComparison.length > 0 ? (
         <Card className="overflow-x-auto">
@@ -193,7 +270,7 @@ export function Dashboard() {
                     <Td className="text-right font-semibold tabular-nums text-neutral-900">{formatCurrency(p.totalSales)}</Td>
                     <Td className="text-right">
                       <div className="ml-auto flex w-28 items-center justify-end gap-2">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
+                        <div className="h-2 flex-1 overflow-hidden bg-neutral-100">
                           <div className="h-full bg-brand-600" style={{ width: `${Math.round(share * 100)}%` }} />
                         </div>
                         <span className="w-9 text-right text-xs tabular-nums text-neutral-600">{Math.round(share * 100)}%</span>
@@ -221,40 +298,69 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Sales by district" description="Value of orders from each district. Taller bar, more sales." />
-          <div className="p-4">
-          {!hasSalesValue ? (
-            <EmptyState text={noValueText} />
-          ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={summary.salesByDistrict}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
-              <XAxis dataKey="districtName" tick={{ fontSize: 11 }} interval={0} angle={-30} textAnchor="end" height={70} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={compactINR} width={56} />
-              <Tooltip formatter={(value) => [formatCurrency(value), "Sales"]} cursor={{ fill: "#f5f5f5" }} />
-              <Bar dataKey="totalSales" fill={COBALT} radius={[2, 2, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-          )}
+          <CardHeader title="Sales by district" description="Which districts brought in the most money, highest first." />
+          <div className="p-5">
+            {!hasSalesValue ? (
+              <EmptyState text={noValueText} />
+            ) : (
+              <RankList
+                rows={[...summary.salesByDistrict]
+                  .sort((a, b) => b.totalSales - a.totalSales)
+                  .map((d) => ({
+                    key: d.districtId,
+                    label: d.districtName,
+                    sub: plural(d.orderCount, "order", "orders"),
+                    value: d.totalSales,
+                  }))}
+                total={summary.totalSales}
+              />
+            )}
           </div>
         </Card>
 
         <Card>
-          <CardHeader title="Sales over time" description="Value of orders taken each day. Point at the line to see the day." />
+          <CardHeader title="Sales each day" description="One bar per day. Point at a bar to see the day, its sales and orders." />
           <div className="p-4">
-          {!hasSalesValue ? (
-            <EmptyState text={noValueText} />
-          ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={summary.ordersOverTime}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} tickFormatter={shortDay} minTickGap={24} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={compactINR} width={56} />
-              <Tooltip formatter={(value) => [formatCurrency(value), "Sales"]} labelFormatter={(d) => longDay(String(d))} />
-              <Line type="monotone" dataKey="total" stroke={COBALT} strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-          )}
+            {!hasSalesValue ? (
+              <EmptyState text={noValueText} />
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={days} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="#ededed" vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 11, fill: "#737373" }}
+                    tickFormatter={shortDay}
+                    minTickGap={28}
+                    tickLine={false}
+                    axisLine={{ stroke: "#d4d4d4" }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#737373" }}
+                    tickFormatter={compactINR}
+                    width={56}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    cursor={{ fill: "#f5f5f5" }}
+                    content={({ active, payload }) => {
+                      const row = active && payload?.[0]?.payload as { day: string; total: number; count: number } | undefined;
+                      if (!row) return null;
+                      return (
+                        <div className="border border-neutral-300 bg-white px-3 py-2 text-[13px] shadow-sm">
+                          <div className="font-semibold text-neutral-900">{longDay(row.day)}</div>
+                          <div className="text-neutral-700">
+                            {row.count ? `${formatCurrency(row.total)} from ${plural(row.count, "order", "orders")}` : "No orders"}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar dataKey="total" fill={COBALT} maxBarSize={28} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
       </div>
@@ -271,7 +377,7 @@ export function Dashboard() {
                 rows={summary.topProducts.map((p) => ({
                   key: p.productId,
                   label: displayProductName(p.name),
-                  sub: `${p.quantity.toLocaleString("en-IN")} packs`,
+                  sub: plural(p.quantity, "pack", "packs"),
                   value: p.revenue,
                 }))}
                 total={summary.totalSales}
@@ -303,17 +409,18 @@ export function Dashboard() {
             <tr>
               <th className="px-5 py-3 font-medium">#</th>
               <th className="px-5 py-3 font-medium">Salesperson</th>
-              <th className="px-5 py-3 font-medium">Orders</th>
-              <th className="px-5 py-3 font-medium">Sales</th>
-              <th className="px-5 py-3 font-medium">Shop visits</th>
-              <th className="px-5 py-3 font-medium" title="How many orders they take for every 10 shop visits">Orders per 10 visits</th>
+              <th className="px-5 py-3 text-right font-medium">Orders</th>
+              <th className="px-5 py-3 text-right font-medium">Sales</th>
+              <th className="px-5 py-3 font-medium">Share of sales</th>
+              <th className="px-5 py-3 text-right font-medium">Shop visits</th>
+              <th className="px-5 py-3 text-right font-medium" title="How many orders they take for every 10 shop visits">Orders per 10 visits</th>
             </tr>
           </thead>
           <tbody>
             {summary.employeeLeaderboard.length === 0 && (
               <tr>
-                <td className="px-5 py-10 text-center text-sm text-neutral-400" colSpan={6}>
-                  No employee activity yet.
+                <td className="px-5 py-10 text-center text-sm text-neutral-400" colSpan={7}>
+                  No salesperson has taken an order or visited a shop in this period.
                 </td>
               </tr>
             )}
@@ -321,10 +428,20 @@ export function Dashboard() {
               <tr key={emp.employeeId} className="border-b border-neutral-100 transition-colors last:border-0 hover:bg-neutral-50/70">
                 <td className="px-5 py-3 text-neutral-400">{i + 1}</td>
                 <td className="px-5 py-3 font-medium text-neutral-800">{emp.name}</td>
-                <td className="px-5 py-3">{emp.ordersCount}</td>
-                <td className="px-5 py-3 font-medium tabular-nums text-neutral-900">{formatCurrency(emp.totalSales)}</td>
-                <td className="px-5 py-3">{emp.visitsCount}</td>
+                <td className="px-5 py-3 text-right tabular-nums">{emp.ordersCount}</td>
+                <td className="px-5 py-3 text-right font-semibold tabular-nums text-neutral-900">{formatCurrency(emp.totalSales)}</td>
                 <td className="px-5 py-3">
+                  <div className="flex w-36 items-center gap-2">
+                    <div className="h-2 flex-1 overflow-hidden bg-neutral-100">
+                      <div className="h-full bg-brand-600" style={{ width: `${summary.totalSales > 0 ? Math.round((emp.totalSales / summary.totalSales) * 100) : 0}%` }} />
+                    </div>
+                    <span className="w-9 text-right text-xs tabular-nums text-neutral-600">
+                      {summary.totalSales > 0 ? Math.round((emp.totalSales / summary.totalSales) * 100) : 0}%
+                    </span>
+                  </div>
+                </td>
+                <td className="px-5 py-3 text-right tabular-nums">{emp.visitsCount}</td>
+                <td className="px-5 py-3 text-right tabular-nums">
                   {emp.conversionRate === null ? "-" : Math.round(emp.conversionRate * 10)}
                 </td>
               </tr>
@@ -465,8 +582,8 @@ function RankList({ rows, total }: { rows: { key: string; label: string; sub?: s
               {total > 0 ? <span className="ml-2 w-10 text-xs font-normal text-neutral-500">{Math.round((r.value / total) * 100)}%</span> : null}
             </span>
           </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-neutral-100">
-            <div className="h-full rounded-full bg-brand-600" style={{ width: `${(r.value / max) * 100}%` }} />
+          <div className="mt-1.5 h-2 overflow-hidden bg-neutral-100">
+            <div className="h-full bg-brand-600" style={{ width: `${(r.value / max) * 100}%` }} />
           </div>
         </li>
       ))}
@@ -480,7 +597,7 @@ function StatusBreakdown({ rows }: { rows: { status: string; count: number }[] }
   const total = sorted.reduce((s, r) => s + r.count, 0);
   return (
     <div className="space-y-4">
-      <div className="flex h-3 overflow-hidden rounded-full bg-neutral-100">
+      <div className="flex h-3 overflow-hidden bg-neutral-100">
         {sorted.map((r) => (
           <div key={r.status} style={{ width: `${(r.count / total) * 100}%`, backgroundColor: STATUS_COLOR[r.status] ?? "#737373" }} />
         ))}
@@ -488,7 +605,7 @@ function StatusBreakdown({ rows }: { rows: { status: string; count: number }[] }
       <ul className="space-y-2">
         {sorted.map((r) => (
           <li key={r.status} className="flex items-center gap-3 text-sm">
-            <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: STATUS_COLOR[r.status] ?? "#737373" }} />
+            <span className="h-3 w-3 shrink-0" style={{ backgroundColor: STATUS_COLOR[r.status] ?? "#737373" }} />
             <span className="flex-1 text-neutral-800">{STATUS_LABEL[r.status] ?? r.status}</span>
             <span className="font-semibold tabular-nums text-neutral-900">{r.count}</span>
             <span className="w-10 text-right text-xs tabular-nums text-neutral-500">{Math.round((r.count / total) * 100)}%</span>
