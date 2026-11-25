@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { CalendarDays, Clock, IndianRupee, ReceiptIndianRupee, Store, UserCheck } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link } from "react-router-dom";
 import { displayProductName } from "../lib/format";
 import { api } from "../lib/api";
@@ -10,7 +10,9 @@ import { Table, Td, Th, Tr } from "../components/ui/Table";
 import { usePlant } from "../context/PlantContext";
 import { Select } from "../components/ui/Input";
 
+// Charts are charcoal; cobalt marks only the leader (top row, best day) so it stands out.
 const COBALT = "#0047ab";
+const CHARCOAL = "#525252";
 
 // In the order an order moves through them.
 const STATUS_ORDER = ["pending", "confirmed", "dispatched", "delivered", "cancelled"];
@@ -176,7 +178,6 @@ export function Dashboard() {
           label="Sales"
           value={formatCurrency(summary.totalSales)}
           icon={IndianRupee}
-          accent
           hint={
             summary.totalOrders
               ? `About ${formatCurrency(Math.round(summary.totalSales / summary.totalOrders))} per order`
@@ -271,7 +272,7 @@ export function Dashboard() {
                     <Td className="text-right">
                       <div className="ml-auto flex w-28 items-center justify-end gap-2">
                         <div className="h-2 flex-1 overflow-hidden bg-neutral-100">
-                          <div className="h-full bg-brand-600" style={{ width: `${Math.round(share * 100)}%` }} />
+                          <div className={`h-full ${p.totalSales > 0 && p.totalSales === Math.max(...summary.plantComparison!.map((x) => x.totalSales)) ? "bg-brand-600" : "bg-neutral-600"}`} style={{ width: `${Math.round(share * 100)}%` }} />
                         </div>
                         <span className="w-9 text-right text-xs tabular-nums text-neutral-600">{Math.round(share * 100)}%</span>
                       </div>
@@ -357,7 +358,11 @@ export function Dashboard() {
                       );
                     }}
                   />
-                  <Bar dataKey="total" fill={COBALT} maxBarSize={28} />
+                  <Bar dataKey="total" maxBarSize={28}>
+                    {days.map((d) => (
+                      <Cell key={d.day} fill={busiestDay && d.day === busiestDay.day ? COBALT : CHARCOAL} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -433,7 +438,7 @@ export function Dashboard() {
                 <td className="px-5 py-3">
                   <div className="flex w-36 items-center gap-2">
                     <div className="h-2 flex-1 overflow-hidden bg-neutral-100">
-                      <div className="h-full bg-brand-600" style={{ width: `${summary.totalSales > 0 ? Math.round((emp.totalSales / summary.totalSales) * 100) : 0}%` }} />
+                      <div className={`h-full ${i === 0 && emp.totalSales > 0 ? "bg-brand-600" : "bg-neutral-600"}`} style={{ width: `${summary.totalSales > 0 ? Math.round((emp.totalSales / summary.totalSales) * 100) : 0}%` }} />
                     </div>
                     <span className="w-9 text-right text-xs tabular-nums text-neutral-600">
                       {summary.totalSales > 0 ? Math.round((emp.totalSales / summary.totalSales) * 100) : 0}%
@@ -583,7 +588,7 @@ function RankList({ rows, total }: { rows: { key: string; label: string; sub?: s
             </span>
           </div>
           <div className="mt-1.5 h-2 overflow-hidden bg-neutral-100">
-            <div className="h-full bg-brand-600" style={{ width: `${(r.value / max) * 100}%` }} />
+            <div className={`h-full ${i === 0 ? "bg-brand-600" : "bg-neutral-600"}`} style={{ width: `${(r.value / max) * 100}%` }} />
           </div>
         </li>
       ))}
